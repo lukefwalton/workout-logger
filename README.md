@@ -4,7 +4,7 @@
 
 A local-first iOS workout tracker — shorthand logging, on-device parsing, progress
 charts, and optional HealthKit. **[$4.99 — product page](https://lukefwalton.com/private-workout-logger/)**
-(App Store, no subscription).
+(App Store · in review · no subscription).
 
 ## Support
 
@@ -45,7 +45,7 @@ from day one, well before any model is wired up.
 
 ## Status
 
-**v1.0** — submitted to the App Store (June 2026). [`docs/learnings/`](docs/learnings/)
+**v1.0** — in App Store review (June 2026). [`docs/learnings/`](docs/learnings/)
 records what each build step taught us along the way.
 
 Shipped in v1.0:
