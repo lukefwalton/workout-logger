@@ -1,0 +1,130 @@
+# XcodeGen project definition.
+# Generate the Xcode project with:  xcodegen generate
+# (install via `brew install xcodegen`). Then set your DEVELOPMENT_TEAM in
+# Signing & Capabilities. The only entitlement is an App Group
+# (group.com.lukewalton.workoutchatlog) so the app and the Home Screen widget
+# can share one on-device SQLite file — register it for the team in the Apple
+# Developer portal. Still no network, no account, no tracking.
+
+name: WorkoutChatLog
+options:
+  bundleIdPrefix: com.lukewalton
+  projectFormat: xcode15_0
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGN_STYLE: Automatic
+
+# Local Swift Package: the LFW design system that gives the app its
+# onboarding/chrome vocabulary. Vendored into this repo (a copy of the package
+# shared across the original monorepo); path is relative to this project.yml.
+packages:
+  LFWDesignSystem:
+    path: lfwdesignsystem
+
+targets:
+  WorkoutChatLog:
+    type: application
+    platform: iOS
+    sources:
+      - path: WorkoutChatLog/App
+      - path: WorkoutChatLog/Features
+      - path: WorkoutChatLog/Health
+      - path: WorkoutChatLog/Model
+      - path: WorkoutChatLog/Parsing
+      - path: WorkoutChatLog/Shared
+      - path: WorkoutChatLog/Storage
+      - path: WorkoutChatLog/Vision
+      - path: WorkoutChatLog/Resources
+        buildPhase: resources    # seed_exercises.json + PrivacyInfo.xcprivacy (App Store upload gate, PR 15)
+    # App Group: the app and the widget (PR 12) open one shared SQLite file from
+    # this container. XcodeGen generates the .entitlements and wires
+    # CODE_SIGN_ENTITLEMENTS. Keep the identifier in sync with AppGroup.identifier
+    # in WorkoutChatLog/Shared/SharedDatabase.swift.
+    # HealthKit (PR 10) is opt-in: the entitlement enables the capability; the
+    # actual writes are gated in-app behind the Settings toggle + permission.
+    entitlements:
+      path: WorkoutChatLog/App/WorkoutChatLog.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.lukewalton.workoutchatlog
+        com.apple.developer.healthkit: true
+    dependencies:
+      # Embed the widget extension into the app bundle.
+      - target: WorkoutWidgetExtension
+      - package: LFWDesignSystem
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lukewalton.workoutchatlog
+        INFOPLIST_FILE: WorkoutChatLog/App/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        # iOS bundles SQLite; link it so `import SQLite3` resolves everywhere.
+        OTHER_LDFLAGS: ["-lsqlite3"]
+
+  # Read-only Home Screen widget (PR 12). Shares the App Group container and reads
+  # the same SQLite file through the Shared module (SQLiteDB + SharedDatabase +
+  # WorkoutWidgetReader) — it never links the WorkoutStore write path.
+  WorkoutWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      # The WorkoutWidget dir also carries the extension's own PrivacyInfo.xcprivacy
+      # (App Store requires a manifest per shipped bundle, PR 15); XcodeGen
+      # auto-bundles the .xcprivacy as a resource. The widget uses no UserDefaults
+      # or other required-reason API, so its accessed-API array is empty.
+      - path: WorkoutWidget
+      - path: WorkoutChatLog/Shared
+      - path: WorkoutChatLog/Storage/SQLiteDB.swift
+    entitlements:
+      path: WorkoutWidget/WorkoutWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.lukewalton.workoutchatlog
+    info:
+      path: WorkoutWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Private Workout Logger
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lukewalton.workoutchatlog.widget
+        # The widget reads SQLite directly too.
+        OTHER_LDFLAGS: ["-lsqlite3"]
+
+  WorkoutChatLogTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: WorkoutChatLogTests
+      # Seed JSON is loaded from the test bundle so storage tests can seed
+      # without hosting into the app.
+      - path: WorkoutChatLog/Resources
+        buildPhase: resources
+    dependencies:
+      - target: WorkoutChatLog
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.lukewalton.workoutchatlog.tests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  WorkoutChatLog:
+    build:
+      targets:
+        WorkoutChatLog: all
+    test:
+      targets:
+        - WorkoutChatLogTests
+    run:
+      config: Debug

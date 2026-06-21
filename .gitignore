@@ -1,36 +1,14 @@
-.env
-.env.*
-!.env.example
+# The Xcode project is generated from project.yml by XcodeGen — never committed.
+*.xcodeproj/
+
+# Xcode / SwiftPM build cruft
+DerivedData/
+build/
+.build/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# macOS
 .DS_Store
-__pycache__/
-*.pyc
-.venv/
-venv/
-output/
-input/
-lead-processor/runtime/
-.ruff_cache/
-.pytest_cache/
-enrichment_cache.json
-ledger.json
-debug/
-sends.json
-stop-political-spam-texts-ios/StopPoliticalSpamTexts.xcodeproj/
-
-# Secrets & credentials — never commit these
-*.pem
-*.key
-id_rsa*
-.aws/
-.ssh/
-credentials.json
-secrets.yaml
-secrets.yml
-token.json
-
-# Node / Vite build artifacts
-node_modules/
-dist/
-.shots/
-*.local
-.vercel/

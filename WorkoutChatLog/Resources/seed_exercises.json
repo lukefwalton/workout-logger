@@ -1,0 +1,1272 @@
+[
+  {
+    "slug": "bench_press",
+    "canonical_name": "Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "bench",
+      "bench press",
+      "flat bench",
+      "barbell bench"
+    ]
+  },
+  {
+    "slug": "incline_bench_press",
+    "canonical_name": "Incline Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "shoulders",
+      "triceps"
+    ],
+    "aliases": [
+      "incline bench",
+      "incline bench press",
+      "incline barbell press"
+    ]
+  },
+  {
+    "slug": "decline_bench_press",
+    "canonical_name": "Decline Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "decline bench",
+      "decline bench press"
+    ]
+  },
+  {
+    "slug": "dumbbell_bench_press",
+    "canonical_name": "Dumbbell Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "db bench",
+      "dumbbell bench",
+      "db bench press",
+      "flat db press"
+    ]
+  },
+  {
+    "slug": "incline_dumbbell_press",
+    "canonical_name": "Incline Dumbbell Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "shoulders",
+      "triceps"
+    ],
+    "aliases": [
+      "incline db press",
+      "incline dumbbell bench",
+      "incline db"
+    ]
+  },
+  {
+    "slug": "dumbbell_fly",
+    "canonical_name": "Dumbbell Fly",
+    "family_key": "chest_fly",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "shoulders"
+    ],
+    "aliases": [
+      "db fly",
+      "chest fly",
+      "dumbbell flyes",
+      "db flyes"
+    ]
+  },
+  {
+    "slug": "cable_crossover",
+    "canonical_name": "Cable Crossover",
+    "family_key": "chest_fly",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "shoulders"
+    ],
+    "aliases": [
+      "cable fly",
+      "crossover",
+      "cable crossovers"
+    ]
+  },
+  {
+    "slug": "push_up",
+    "canonical_name": "Push-Up",
+    "family_key": null,
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "pushup",
+      "push up",
+      "pushups",
+      "push-ups"
+    ]
+  },
+  {
+    "slug": "chest_dip",
+    "canonical_name": "Chest Dip",
+    "family_key": "dip",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "chest dips",
+      "weighted chest dip"
+    ]
+  },
+  {
+    "slug": "machine_chest_press",
+    "canonical_name": "Machine Chest Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "chest press machine",
+      "machine press",
+      "machine chest press"
+    ]
+  },
+  {
+    "slug": "pec_deck",
+    "canonical_name": "Pec Deck",
+    "family_key": "chest_fly",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "shoulders"
+    ],
+    "aliases": [
+      "pec deck fly",
+      "machine fly",
+      "machine chest fly",
+      "pec deck"
+    ]
+  },
+  {
+    "slug": "smith_machine_bench_press",
+    "canonical_name": "Smith Machine Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "triceps",
+      "shoulders"
+    ],
+    "aliases": [
+      "smith bench",
+      "smith bench press",
+      "smith machine bench"
+    ]
+  },
+  {
+    "slug": "smith_machine_incline_bench_press",
+    "canonical_name": "Smith Machine Incline Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "chest",
+    "secondary_muscles": [
+      "shoulders",
+      "triceps"
+    ],
+    "aliases": [
+      "smith incline bench",
+      "smith incline press",
+      "smith machine incline"
+    ]
+  },
+  {
+    "slug": "overhead_press",
+    "canonical_name": "Overhead Press",
+    "family_key": "overhead_press",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "triceps",
+      "traps"
+    ],
+    "aliases": [
+      "ohp",
+      "military press",
+      "shoulder press",
+      "strict press",
+      "standing press"
+    ]
+  },
+  {
+    "slug": "seated_dumbbell_shoulder_press",
+    "canonical_name": "Seated Dumbbell Shoulder Press",
+    "family_key": "overhead_press",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "triceps"
+    ],
+    "aliases": [
+      "db shoulder press",
+      "seated db press",
+      "dumbbell shoulder press",
+      "seated dumbbell press"
+    ]
+  },
+  {
+    "slug": "machine_shoulder_press",
+    "canonical_name": "Machine Shoulder Press",
+    "family_key": "overhead_press",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "triceps"
+    ],
+    "aliases": [
+      "shoulder press machine",
+      "machine press shoulder",
+      "machine overhead press"
+    ]
+  },
+  {
+    "slug": "arnold_press",
+    "canonical_name": "Arnold Press",
+    "family_key": "overhead_press",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "triceps"
+    ],
+    "aliases": [
+      "arnold press",
+      "arnolds"
+    ]
+  },
+  {
+    "slug": "lateral_raise",
+    "canonical_name": "Lateral Raise",
+    "family_key": "lateral_raise",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [],
+    "aliases": [
+      "lat raise",
+      "side raise",
+      "lateral raises",
+      "db lateral raise"
+    ]
+  },
+  {
+    "slug": "cable_lateral_raise",
+    "canonical_name": "Cable Lateral Raise",
+    "family_key": "lateral_raise",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [],
+    "aliases": [
+      "cable lateral",
+      "cable lat raise",
+      "single arm cable lateral raise"
+    ]
+  },
+  {
+    "slug": "machine_lateral_raise",
+    "canonical_name": "Machine Lateral Raise",
+    "family_key": "lateral_raise",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [],
+    "aliases": [
+      "lateral raise machine",
+      "machine lat raise",
+      "machine side raise"
+    ]
+  },
+  {
+    "slug": "front_raise",
+    "canonical_name": "Front Raise",
+    "family_key": null,
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [],
+    "aliases": [
+      "front raises",
+      "db front raise",
+      "plate front raise"
+    ]
+  },
+  {
+    "slug": "reverse_fly",
+    "canonical_name": "Reverse Fly",
+    "family_key": "rear_delt_fly",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "traps"
+    ],
+    "aliases": [
+      "rear delt fly",
+      "reverse flyes",
+      "rear fly"
+    ]
+  },
+  {
+    "slug": "rear_delt_pec_deck",
+    "canonical_name": "Rear Delt Pec Deck",
+    "family_key": "rear_delt_fly",
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "traps"
+    ],
+    "aliases": [
+      "reverse pec deck",
+      "rear delt machine",
+      "rear delt pec deck"
+    ]
+  },
+  {
+    "slug": "face_pull",
+    "canonical_name": "Face Pull",
+    "family_key": null,
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "traps",
+      "biceps"
+    ],
+    "aliases": [
+      "face pulls",
+      "cable face pull"
+    ]
+  },
+  {
+    "slug": "upright_row",
+    "canonical_name": "Upright Row",
+    "family_key": null,
+    "primary_muscle": "shoulders",
+    "secondary_muscles": [
+      "traps",
+      "biceps"
+    ],
+    "aliases": [
+      "upright rows",
+      "barbell upright row"
+    ]
+  },
+  {
+    "slug": "deadlift",
+    "canonical_name": "Deadlift",
+    "family_key": "deadlift",
+    "primary_muscle": "lower back",
+    "secondary_muscles": [
+      "hamstrings",
+      "glutes",
+      "quadriceps",
+      "traps",
+      "forearms"
+    ],
+    "aliases": [
+      "deadlift",
+      "conventional deadlift",
+      "dl",
+      "deads"
+    ]
+  },
+  {
+    "slug": "romanian_deadlift",
+    "canonical_name": "Romanian Deadlift",
+    "family_key": "deadlift",
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "glutes",
+      "lower back"
+    ],
+    "aliases": [
+      "rdl",
+      "romanian deadlift",
+      "rdls",
+      "romanian deadlifts"
+    ]
+  },
+  {
+    "slug": "sumo_deadlift",
+    "canonical_name": "Sumo Deadlift",
+    "family_key": "deadlift",
+    "primary_muscle": "glutes",
+    "secondary_muscles": [
+      "hamstrings",
+      "quadriceps",
+      "lower back"
+    ],
+    "aliases": [
+      "sumo deadlift",
+      "sumo dl",
+      "sumo deads"
+    ]
+  },
+  {
+    "slug": "pull_up",
+    "canonical_name": "Pull-Up",
+    "family_key": "pull_up",
+    "primary_muscle": "lats",
+    "secondary_muscles": [
+      "biceps",
+      "middle back",
+      "forearms"
+    ],
+    "aliases": [
+      "pullup",
+      "pull up",
+      "pullups",
+      "pull-ups"
+    ]
+  },
+  {
+    "slug": "chin_up",
+    "canonical_name": "Chin-Up",
+    "family_key": "pull_up",
+    "primary_muscle": "lats",
+    "secondary_muscles": [
+      "biceps",
+      "middle back"
+    ],
+    "aliases": [
+      "chinup",
+      "chin up",
+      "chinups",
+      "chin-ups"
+    ]
+  },
+  {
+    "slug": "lat_pulldown",
+    "canonical_name": "Lat Pulldown",
+    "family_key": "pulldown",
+    "primary_muscle": "lats",
+    "secondary_muscles": [
+      "biceps",
+      "middle back"
+    ],
+    "aliases": [
+      "pulldown",
+      "lat pulldowns",
+      "lat pull down",
+      "pulldowns"
+    ]
+  },
+  {
+    "slug": "barbell_row",
+    "canonical_name": "Barbell Row",
+    "family_key": "row",
+    "primary_muscle": "middle back",
+    "secondary_muscles": [
+      "lats",
+      "biceps",
+      "lower back"
+    ],
+    "aliases": [
+      "bent over row",
+      "barbell rows",
+      "bb row",
+      "bent-over row",
+      "pendlay row"
+    ]
+  },
+  {
+    "slug": "dumbbell_row",
+    "canonical_name": "Dumbbell Row",
+    "family_key": "row",
+    "primary_muscle": "middle back",
+    "secondary_muscles": [
+      "lats",
+      "biceps"
+    ],
+    "aliases": [
+      "db row",
+      "one arm row",
+      "single arm row",
+      "dumbbell rows"
+    ]
+  },
+  {
+    "slug": "seated_cable_row",
+    "canonical_name": "Seated Cable Row",
+    "family_key": "row",
+    "primary_muscle": "middle back",
+    "secondary_muscles": [
+      "lats",
+      "biceps"
+    ],
+    "aliases": [
+      "cable row",
+      "seated row",
+      "seated cable rows"
+    ]
+  },
+  {
+    "slug": "chest_supported_row",
+    "canonical_name": "Chest-Supported Row",
+    "family_key": "row",
+    "primary_muscle": "middle back",
+    "secondary_muscles": [
+      "lats",
+      "biceps"
+    ],
+    "aliases": [
+      "chest supported row",
+      "chest supported rows",
+      "incline bench row"
+    ]
+  },
+  {
+    "slug": "machine_row",
+    "canonical_name": "Machine Row",
+    "family_key": "row",
+    "primary_muscle": "middle back",
+    "secondary_muscles": [
+      "lats",
+      "biceps"
+    ],
+    "aliases": [
+      "row machine",
+      "machine rows",
+      "plate loaded row"
+    ]
+  },
+  {
+    "slug": "assisted_pull_up",
+    "canonical_name": "Assisted Pull-Up",
+    "family_key": "pull_up",
+    "primary_muscle": "lats",
+    "secondary_muscles": [
+      "biceps",
+      "middle back"
+    ],
+    "aliases": [
+      "assisted pullup",
+      "assisted pull up",
+      "assisted pull-ups"
+    ]
+  },
+  {
+    "slug": "straight_arm_pulldown",
+    "canonical_name": "Straight-Arm Pulldown",
+    "family_key": "pulldown",
+    "primary_muscle": "lats",
+    "secondary_muscles": [
+      "triceps"
+    ],
+    "aliases": [
+      "straight arm pulldown",
+      "straight arm pushdown",
+      "cable pullover"
+    ]
+  },
+  {
+    "slug": "t_bar_row",
+    "canonical_name": "T-Bar Row",
+    "family_key": "row",
+    "primary_muscle": "middle back",
+    "secondary_muscles": [
+      "lats",
+      "biceps"
+    ],
+    "aliases": [
+      "t bar row",
+      "tbar row",
+      "t-bar rows"
+    ]
+  },
+  {
+    "slug": "shrug",
+    "canonical_name": "Shrug",
+    "family_key": null,
+    "primary_muscle": "traps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "shrugs",
+      "barbell shrug",
+      "dumbbell shrug",
+      "db shrug"
+    ]
+  },
+  {
+    "slug": "back_extension",
+    "canonical_name": "Back Extension",
+    "family_key": null,
+    "primary_muscle": "lower back",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "hyperextension",
+      "back extensions",
+      "hyperextensions",
+      "45 degree back extension"
+    ]
+  },
+  {
+    "slug": "back_squat",
+    "canonical_name": "Back Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings",
+      "lower back"
+    ],
+    "aliases": [
+      "squat",
+      "squats",
+      "back squats",
+      "high bar squat",
+      "bb squat"
+    ]
+  },
+  {
+    "slug": "front_squat",
+    "canonical_name": "Front Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "lower back"
+    ],
+    "aliases": [
+      "front squats"
+    ]
+  },
+  {
+    "slug": "leg_press",
+    "canonical_name": "Leg Press",
+    "family_key": null,
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "leg press machine",
+      "leg presses"
+    ]
+  },
+  {
+    "slug": "bulgarian_split_squat",
+    "canonical_name": "Bulgarian Split Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "split squat",
+      "bss",
+      "bulgarian split squats",
+      "rfe split squat"
+    ]
+  },
+  {
+    "slug": "lunge",
+    "canonical_name": "Lunge",
+    "family_key": null,
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "lunges",
+      "walking lunge",
+      "db lunge",
+      "reverse lunge"
+    ]
+  },
+  {
+    "slug": "goblet_squat",
+    "canonical_name": "Goblet Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes"
+    ],
+    "aliases": [
+      "goblet squats"
+    ]
+  },
+  {
+    "slug": "hack_squat",
+    "canonical_name": "Hack Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes"
+    ],
+    "aliases": [
+      "hack squats",
+      "machine hack squat"
+    ]
+  },
+  {
+    "slug": "smith_machine_squat",
+    "canonical_name": "Smith Machine Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "smith squat",
+      "smith machine squats",
+      "smith squats"
+    ]
+  },
+  {
+    "slug": "belt_squat",
+    "canonical_name": "Belt Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes"
+    ],
+    "aliases": [
+      "belt squats",
+      "machine belt squat"
+    ]
+  },
+  {
+    "slug": "leg_extension",
+    "canonical_name": "Leg Extension",
+    "family_key": null,
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "leg extensions",
+      "quad extension",
+      "knee extension"
+    ]
+  },
+  {
+    "slug": "leg_curl",
+    "canonical_name": "Leg Curl",
+    "family_key": "leg_curl",
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "calves"
+    ],
+    "aliases": [
+      "hamstring curl",
+      "leg curls"
+    ]
+  },
+  {
+    "slug": "seated_leg_curl",
+    "canonical_name": "Seated Leg Curl",
+    "family_key": "leg_curl",
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "calves"
+    ],
+    "aliases": [
+      "seated hamstring curl",
+      "seated leg curls"
+    ]
+  },
+  {
+    "slug": "lying_leg_curl",
+    "canonical_name": "Lying Leg Curl",
+    "family_key": "leg_curl",
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "calves"
+    ],
+    "aliases": [
+      "lying hamstring curl",
+      "prone leg curl",
+      "lying leg curls"
+    ]
+  },
+  {
+    "slug": "hip_thrust",
+    "canonical_name": "Hip Thrust",
+    "family_key": "hip_thrust",
+    "primary_muscle": "glutes",
+    "secondary_muscles": [
+      "hamstrings"
+    ],
+    "aliases": [
+      "hip thrusts",
+      "barbell hip thrust",
+      "bb hip thrust"
+    ]
+  },
+  {
+    "slug": "glute_bridge",
+    "canonical_name": "Glute Bridge",
+    "family_key": "hip_thrust",
+    "primary_muscle": "glutes",
+    "secondary_muscles": [
+      "hamstrings"
+    ],
+    "aliases": [
+      "glute bridges",
+      "barbell glute bridge"
+    ]
+  },
+  {
+    "slug": "calf_raise",
+    "canonical_name": "Calf Raise",
+    "family_key": "calf_raise",
+    "primary_muscle": "calves",
+    "secondary_muscles": [],
+    "aliases": [
+      "calf raises",
+      "standing calf raise",
+      "calves",
+      "standing calf raises"
+    ]
+  },
+  {
+    "slug": "seated_calf_raise",
+    "canonical_name": "Seated Calf Raise",
+    "family_key": "calf_raise",
+    "primary_muscle": "calves",
+    "secondary_muscles": [],
+    "aliases": [
+      "seated calf raises"
+    ]
+  },
+  {
+    "slug": "hip_abduction",
+    "canonical_name": "Hip Abduction",
+    "family_key": null,
+    "primary_muscle": "abductors",
+    "secondary_muscles": [
+      "glutes"
+    ],
+    "aliases": [
+      "abductor machine",
+      "hip abduction machine",
+      "abduction"
+    ]
+  },
+  {
+    "slug": "hip_adduction",
+    "canonical_name": "Hip Adduction",
+    "family_key": null,
+    "primary_muscle": "adductors",
+    "secondary_muscles": [],
+    "aliases": [
+      "adductor machine",
+      "inner thigh machine",
+      "adduction",
+      "hip adduction machine"
+    ]
+  },
+  {
+    "slug": "barbell_curl",
+    "canonical_name": "Barbell Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "bb curl",
+      "barbell curls"
+    ]
+  },
+  {
+    "slug": "ez_bar_curl",
+    "canonical_name": "EZ-Bar Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "ez bar curl",
+      "ez curl",
+      "ez-bar curl"
+    ]
+  },
+  {
+    "slug": "dumbbell_curl",
+    "canonical_name": "Dumbbell Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "db curl",
+      "dumbbell curls",
+      "bicep curl",
+      "alternating curl",
+      "alternating dumbbell curl"
+    ]
+  },
+  {
+    "slug": "hammer_curl",
+    "canonical_name": "Hammer Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "hammer curls",
+      "db hammer curl",
+      "rope hammer curl"
+    ]
+  },
+  {
+    "slug": "preacher_curl",
+    "canonical_name": "Preacher Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "preacher curls",
+      "ez preacher curl",
+      "machine preacher curl"
+    ]
+  },
+  {
+    "slug": "incline_dumbbell_curl",
+    "canonical_name": "Incline Dumbbell Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "incline curl",
+      "incline db curl",
+      "incline curls",
+      "incline dumbbell curls"
+    ]
+  },
+  {
+    "slug": "cable_curl",
+    "canonical_name": "Cable Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "cable curls",
+      "cable bicep curl"
+    ]
+  },
+  {
+    "slug": "concentration_curl",
+    "canonical_name": "Concentration Curl",
+    "family_key": "biceps_curl",
+    "primary_muscle": "biceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "concentration curls"
+    ]
+  },
+  {
+    "slug": "triceps_pushdown",
+    "canonical_name": "Triceps Pushdown",
+    "family_key": null,
+    "primary_muscle": "triceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "pushdown",
+      "tricep pushdown",
+      "cable pushdown",
+      "pushdowns",
+      "rope pushdown"
+    ]
+  },
+  {
+    "slug": "overhead_triceps_extension",
+    "canonical_name": "Overhead Triceps Extension",
+    "family_key": "triceps_extension",
+    "primary_muscle": "triceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "overhead extension",
+      "overhead tricep extension",
+      "french press",
+      "db overhead extension"
+    ]
+  },
+  {
+    "slug": "rope_overhead_triceps_extension",
+    "canonical_name": "Rope Overhead Triceps Extension",
+    "family_key": "triceps_extension",
+    "primary_muscle": "triceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "rope overhead extension",
+      "cable overhead triceps extension",
+      "rope overhead tricep extension"
+    ]
+  },
+  {
+    "slug": "single_arm_cable_triceps_extension",
+    "canonical_name": "Single-Arm Cable Triceps Extension",
+    "family_key": "triceps_extension",
+    "primary_muscle": "triceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "single arm cable tricep extension",
+      "one arm cable triceps extension",
+      "single arm tricep extension"
+    ]
+  },
+  {
+    "slug": "skull_crusher",
+    "canonical_name": "Skull Crusher",
+    "family_key": "triceps_extension",
+    "primary_muscle": "triceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "skullcrusher",
+      "skull crushers",
+      "lying tricep extension",
+      "ez skull crusher"
+    ]
+  },
+  {
+    "slug": "triceps_dip",
+    "canonical_name": "Triceps Dip",
+    "family_key": "dip",
+    "primary_muscle": "triceps",
+    "secondary_muscles": [
+      "chest",
+      "shoulders"
+    ],
+    "aliases": [
+      "tricep dips",
+      "bench dip",
+      "tricep dip",
+      "bench dips"
+    ]
+  },
+  {
+    "slug": "close_grip_bench_press",
+    "canonical_name": "Close-Grip Bench Press",
+    "family_key": "bench_press",
+    "primary_muscle": "triceps",
+    "secondary_muscles": [
+      "chest",
+      "shoulders"
+    ],
+    "aliases": [
+      "close grip bench",
+      "cgbp",
+      "close grip bench press",
+      "close-grip bench"
+    ]
+  },
+  {
+    "slug": "triceps_kickback",
+    "canonical_name": "Triceps Kickback",
+    "family_key": null,
+    "primary_muscle": "triceps",
+    "secondary_muscles": [],
+    "aliases": [
+      "kickback",
+      "tricep kickback",
+      "kickbacks",
+      "db kickback"
+    ]
+  },
+  {
+    "slug": "wrist_curl",
+    "canonical_name": "Wrist Curl",
+    "family_key": null,
+    "primary_muscle": "forearms",
+    "secondary_muscles": [],
+    "aliases": [
+      "wrist curls",
+      "barbell wrist curl",
+      "seated wrist curl"
+    ]
+  },
+  {
+    "slug": "reverse_curl",
+    "canonical_name": "Reverse Curl",
+    "family_key": null,
+    "primary_muscle": "forearms",
+    "secondary_muscles": [
+      "biceps"
+    ],
+    "aliases": [
+      "reverse curls",
+      "ez bar reverse curl",
+      "reverse barbell curl"
+    ]
+  },
+  {
+    "slug": "farmers_walk",
+    "canonical_name": "Farmer's Walk",
+    "family_key": null,
+    "primary_muscle": "forearms",
+    "secondary_muscles": [
+      "traps",
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "farmers walk",
+      "farmer carry",
+      "farmers carry",
+      "farmer's carry"
+    ]
+  },
+  {
+    "slug": "plank",
+    "canonical_name": "Plank",
+    "family_key": null,
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [],
+    "aliases": [
+      "planks",
+      "front plank",
+      "forearm plank"
+    ]
+  },
+  {
+    "slug": "crunch",
+    "canonical_name": "Crunch",
+    "family_key": "crunch",
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [],
+    "aliases": [
+      "crunches",
+      "ab crunch",
+      "floor crunch"
+    ]
+  },
+  {
+    "slug": "hanging_leg_raise",
+    "canonical_name": "Hanging Leg Raise",
+    "family_key": null,
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [
+      "forearms"
+    ],
+    "aliases": [
+      "hanging leg raises",
+      "leg raise",
+      "leg raises",
+      "hanging knee raise"
+    ]
+  },
+  {
+    "slug": "cable_crunch",
+    "canonical_name": "Cable Crunch",
+    "family_key": "crunch",
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [],
+    "aliases": [
+      "cable crunches",
+      "kneeling cable crunch"
+    ]
+  },
+  {
+    "slug": "russian_twist",
+    "canonical_name": "Russian Twist",
+    "family_key": null,
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [],
+    "aliases": [
+      "russian twists"
+    ]
+  },
+  {
+    "slug": "ab_wheel_rollout",
+    "canonical_name": "Ab Wheel Rollout",
+    "family_key": null,
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [],
+    "aliases": [
+      "ab wheel",
+      "ab rollout",
+      "rollouts",
+      "ab wheel rollouts"
+    ]
+  },
+  {
+    "slug": "sit_up",
+    "canonical_name": "Sit-Up",
+    "family_key": null,
+    "primary_muscle": "abdominals",
+    "secondary_muscles": [],
+    "aliases": [
+      "situp",
+      "sit up",
+      "situps",
+      "sit-ups"
+    ]
+  },
+  {
+    "slug": "power_clean",
+    "canonical_name": "Power Clean",
+    "family_key": "olympic_lift",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings",
+      "traps",
+      "shoulders",
+      "lower back"
+    ],
+    "aliases": [
+      "power cleans",
+      "clean",
+      "cleans"
+    ]
+  },
+  {
+    "slug": "clean_and_jerk",
+    "canonical_name": "Clean and Jerk",
+    "family_key": "olympic_lift",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "shoulders",
+      "glutes",
+      "traps",
+      "hamstrings"
+    ],
+    "aliases": [
+      "c&j",
+      "clean & jerk",
+      "clean jerk"
+    ]
+  },
+  {
+    "slug": "snatch",
+    "canonical_name": "Snatch",
+    "family_key": "olympic_lift",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "shoulders",
+      "glutes",
+      "hamstrings",
+      "traps",
+      "lower back"
+    ],
+    "aliases": [
+      "snatches",
+      "power snatch",
+      "squat snatch"
+    ]
+  }
+]

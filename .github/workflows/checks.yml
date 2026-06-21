@@ -1,0 +1,21 @@
+name: Checks
+
+# Config guardrails that don't need Xcode. Validates that the App Group
+# identifier in project.yml matches the constant in
+# Shared/SharedDatabase.swift, so the app and the Home Screen widget can never
+# drift onto two different on-device databases. Companion to ios-tests.yml,
+# which handles the actual iOS build/test.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  config-guardrails:
+    name: Config guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: App Group identifier sync (project.yml ↔ Swift)
+        run: bash scripts/check_appgroup_sync.sh
