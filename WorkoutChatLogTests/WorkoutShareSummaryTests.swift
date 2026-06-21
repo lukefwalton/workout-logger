@@ -16,10 +16,10 @@ final class WorkoutShareSummaryTests: XCTestCase {
 
     private func row(date: String, exercise: String, setIndex: Int, load: WorkoutLoad, reps: Int,
                      rir: Int? = nil, type: SetType = .working, notes: String? = nil,
-                     sessionID: Int64 = 1, setID: Int64 = 1) -> WorkoutSetHistoryRow {
+                     sessionID: Int64 = 1, setID: Int64 = 1, exerciseID: Int64 = 1) -> WorkoutSetHistoryRow {
         WorkoutSetHistoryRow(sessionID: sessionID, sessionName: nil, sessionNotes: nil, startedAt: date,
                              sessionEndedAt: nil, sessionFeel: nil, sessionIsDeload: false,
-                             setID: setID, exerciseID: 1, exerciseName: exercise, setIndex: setIndex,
+                             setID: setID, exerciseID: exerciseID, exerciseName: exercise, setIndex: setIndex,
                              setType: type, load: load, reps: reps, rir: rir, notes: notes,
                              sourceText: nil, primaryMuscle: nil)
     }
@@ -127,8 +127,8 @@ final class WorkoutShareSummaryTests: XCTestCase {
         // detail table these names are interior cells, so only a trend row starts with
         // "| <name> |" — keeping this assertion about the sort, not section ordering.
         let out = WorkoutShareSummary.aiPrompt(rows: [
-            row(date: "2026-06-01", exercise: "Bench Press", setIndex: 1, load: ext(135), reps: 8, sessionID: 1, setID: 1),
-            row(date: "2026-06-01", exercise: "arnold press", setIndex: 1, load: ext(40), reps: 10, sessionID: 1, setID: 2),
+            row(date: "2026-06-01", exercise: "Bench Press", setIndex: 1, load: ext(135), reps: 8, sessionID: 1, setID: 1, exerciseID: 1),
+            row(date: "2026-06-01", exercise: "arnold press", setIndex: 1, load: ext(40), reps: 10, sessionID: 1, setID: 2, exerciseID: 2),
         ], days: 30, includeTrends: true)
         let lines = out.components(separatedBy: "\n")
         guard let arnold = lines.firstIndex(where: { $0.hasPrefix("| arnold press |") }),
