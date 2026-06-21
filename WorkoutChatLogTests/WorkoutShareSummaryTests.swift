@@ -123,16 +123,18 @@ final class WorkoutShareSummaryTests: XCTestCase {
 
     func testTrendRowsSortCaseInsensitively() {
         // 'arnold press' (lowercase) must sort before 'Bench Press' — a case-sensitive
-        // sort would put uppercase 'B' first.
+        // sort would put uppercase 'B' first. Match trend rows by line prefix: in the
+        // detail table these names are interior cells, so only a trend row starts with
+        // "| <name> |" — keeping this assertion about the sort, not section ordering.
         let out = WorkoutShareSummary.aiPrompt(rows: [
             row(date: "2026-06-01", exercise: "Bench Press", setIndex: 1, load: ext(135), reps: 8, sessionID: 1, setID: 1),
             row(date: "2026-06-01", exercise: "arnold press", setIndex: 1, load: ext(40), reps: 10, sessionID: 1, setID: 2),
         ], days: 30, includeTrends: true)
-        guard let arnold = out.range(of: "| arnold press |"),
-              let bench = out.range(of: "| Bench Press |") else {
-            return XCTFail("both exercises should appear in the trend section:\n\(out)")
+        let lines = out.components(separatedBy: "\n")
+        guard let arnold = lines.firstIndex(where: { $0.hasPrefix("| arnold press |") }),
+              let bench = lines.firstIndex(where: { $0.hasPrefix("| Bench Press |") }) else {
+            return XCTFail("both exercises should appear as trend rows:\n\(out)")
         }
-        XCTAssertLessThan(arnold.lowerBound, bench.lowerBound,
-                          "trend rows sort case-insensitively")
+        XCTAssertLessThan(arnold, bench, "trend rows sort case-insensitively")
     }
 }

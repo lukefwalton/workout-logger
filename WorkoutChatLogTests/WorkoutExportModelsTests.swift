@@ -53,6 +53,16 @@ final class WorkoutExportModelsTests: XCTestCase {
         }
     }
 
+    func testExportTopLevelKeysAreExactlyTheWireContract() throws {
+        // A structural check alongside the substring assertions: if a top-level key is
+        // renamed or added, this localizes the failure instead of a vague missing substring.
+        let data = try JSONEncoder().encode(sampleExport())
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        XCTAssertEqual(Set((object ?? [:]).keys),
+                       ["schema_version", "exported_at", "app", "analytics_policy", "exercises", "sessions"],
+                       "top-level export keys are frozen")
+    }
+
     func testAnalyticsPolicyExportsSortedRawValuesUnderSnakeCaseKeys() throws {
         let exported = ExportedAnalyticsPolicy(.default)
         XCTAssertEqual(exported.hardSetRIRThreshold, 4)
