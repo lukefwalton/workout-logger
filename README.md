@@ -3,8 +3,8 @@
 > **No subscription. No cloud. No tracking.**
 
 A local-first iOS workout tracker — shorthand logging, on-device parsing, progress
-charts, and optional HealthKit. **[$4.99 on the App Store](https://lukefwalton.com/private-workout-logger/)**
-(no subscription).
+charts, and optional HealthKit. **[$4.99 — product page](https://lukefwalton.com/private-workout-logger/)**
+(App Store, no subscription).
 
 ## Support
 

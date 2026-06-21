@@ -1,16 +1,16 @@
-# WorkoutChatLog — Privacy Policy
+# Private Workout Logger — Privacy Policy
 
 _Last updated: 2026-06-21_
 
-WorkoutChatLog is built privacy-first. The short version: **your data stays on
-your device.** There is no account, no server, and no tracking.
+Private Workout Logger is built privacy-first. The short version: **your data
+stays on your device.** There is no account, no server, and no tracking.
 
 ## What we collect
 
-**Nothing.** WorkoutChatLog has no analytics, no advertising SDKs, no crash
-reporting that leaves the device, and no third-party trackers. We do not collect
-a name, an email, an advertising identifier, or any usage data. There is no
-sign-up and no login because there is no account.
+**Nothing.** Private Workout Logger has no analytics, no advertising SDKs, no
+crash reporting that leaves the device, and no third-party trackers. We do not
+collect a name, an email, an advertising identifier, or any usage data. There
+is no sign-up and no login because there is no account.
 
 ## Where your data lives
 
@@ -28,7 +28,7 @@ never transmit your log to our own servers because we don't have any.
 ## Apple Health (optional, opt-in)
 
 If — and only if — you explicitly turn it on in Settings and grant permission,
-WorkoutChatLog can:
+Private Workout Logger can:
 
 - **Read** your most recent body weight, used only on-device to estimate
   calories.
@@ -56,7 +56,7 @@ When you tap an export or share action, you decide where the data goes (for
 example, the iOS share sheet). The app prepares that payload locally; it is sent
 only because you chose to send it.
 
-## What WorkoutChatLog does not do
+## What Private Workout Logger does not do
 
 - No accounts, no servers, no cloud sync operated by us.
 - No analytics, no telemetry, no advertising, no ad identifiers, no ATT prompt.

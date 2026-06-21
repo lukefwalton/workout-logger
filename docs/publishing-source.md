@@ -16,7 +16,7 @@ Checklist before flipping visibility on GitHub.
 1. **Confirm no secrets in history**
    ```bash
    git log --all -- project.local.yml   # should be empty
-   git grep -i 'D7B4B2Q2RW' $(git rev-list --all)  # should find nothing
+   git grep -i 'YOUR_TEAM_ID_HERE' $(git rev-list --all)  # should find nothing (except project.local.yml.example)
    ```
 
 2. **Optional:** Add repo topics on GitHub — `ios`, `swift`, `swiftui`, `privacy`,
