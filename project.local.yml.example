@@ -1,0 +1,27 @@
+# Copy to project.local.yml and fill in your Apple Developer Team ID.
+# Find it at developer.apple.com → Membership → Team ID (10 characters).
+# Then: xcodegen generate && open WorkoutChatLog.xcodeproj
+#
+# If you don't own com.lukewalton.*, change bundleIdPrefix and bundle IDs below
+# to match App IDs you registered in the Developer portal.
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: YOUR_TEAM_ID_HERE
+
+# Uncomment to use your own bundle prefix instead of com.lukewalton:
+# options:
+#   bundleIdPrefix: com.yourname
+# targets:
+#   WorkoutChatLog:
+#     settings:
+#       base:
+#         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.workoutchatlog
+#   WorkoutWidgetExtension:
+#     settings:
+#       base:
+#         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.workoutchatlog.widget
+#   WorkoutChatLogTests:
+#     settings:
+#       base:
+#         PRODUCT_BUNDLE_IDENTIFIER: com.yourname.workoutchatlog.tests
