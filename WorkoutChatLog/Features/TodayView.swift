@@ -561,6 +561,27 @@ struct TodayView: View {
                     }
                     .fieldPill()
 
+                    // Shared reps editor — shown only when every set carries the
+                    // same rep count (or none do yet), so a parsed uneven entry
+                    // like 8,8,7 isn't flattened by one field. Uneven drafts keep
+                    // their per-set summary below as the source of truth.
+                    if model.pendingRepsAreUniform {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Reps")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Theme.steel)
+                            TextField("Add reps", value: Binding(get: { model.pendingReps },
+                                                                 set: model.setReps),
+                                      format: .number)
+                                .font(.headline)
+                                .textFieldStyle(.plain)
+                                .keyboardType(.numberPad)
+                                .accessibilityLabel("Reps per set")
+                        }
+                        .fieldPill()
+                    }
+
                     // Plate calculator (§4): barbell loads only. Gated to `.external`
                     // so it never appears for bodyweight-plus / assisted entries, where
                     // a "load the bar" sheet would be misleading.
@@ -580,6 +601,32 @@ struct TodayView: View {
                 }
 
                 VStack(spacing: 8) {
+                    HStack {
+                        Text("Sets")
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(Theme.steel).textCase(.uppercase)
+                        Spacer()
+                        Button { model.removeSet() } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(model.pendingSetCount > 1 ? Theme.ocean : Theme.steel.opacity(0.35))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.pendingSetCount <= 1)
+                        .accessibilityLabel("Remove a set")
+                        Text("\(model.pendingSetCount)")
+                            .font(.headline).monospacedDigit()
+                            .frame(minWidth: 28)
+                            .foregroundStyle(Theme.ink)
+                        Button { model.addSet() } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(Theme.ocean)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add a set")
+                    }
+
                     ForEach(Array(pending.sets.enumerated()), id: \.offset) { index, set in
                         HStack {
                             Text("Set \(index + 1)")
@@ -1037,17 +1084,20 @@ struct TodayView: View {
     /// "135 lb × 8 · warmup · 2 RIR" — only the parts that are present.
     static func summary(for set: SetDraft) -> String {
         var parts: [String] = []
+        // reps = 0 is the "not filled in yet" sentinel on a recovered draft; show
+        // a dash so the row reads "needs reps", not a literal "× 0".
+        let reps = set.reps > 0 ? "\(set.reps)" : "—"
         switch set.loadKind {
         case .bodyweight:
-            parts.append("BW × \(set.reps)")
+            parts.append("BW × \(reps)")
         case .unspecified:
-            parts.append("unspecified × \(set.reps)")
+            parts.append("unspecified × \(reps)")
         case .bodyweightPlus:
-            parts.append("BW + \(formatted(set.weight)) \(set.unit.rawValue) × \(set.reps)")
+            parts.append("BW + \(formatted(set.weight)) \(set.unit.rawValue) × \(reps)")
         case .assisted:
-            parts.append("assisted \(formatted(set.weight)) \(set.unit.rawValue) × \(set.reps)")
+            parts.append("assisted \(formatted(set.weight)) \(set.unit.rawValue) × \(reps)")
         case .external:
-            parts.append("\(formatted(set.weight)) \(set.unit.rawValue) × \(set.reps)")
+            parts.append("\(formatted(set.weight)) \(set.unit.rawValue) × \(reps)")
         }
         if set.setType != .working { parts.append(set.setType.rawValue) }
         if let rir = set.rir { parts.append("\(rir) RIR") }

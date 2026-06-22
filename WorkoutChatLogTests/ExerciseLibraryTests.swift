@@ -118,6 +118,6 @@ final class ExerciseLibraryTests: XCTestCase {
         let bench = try XCTUnwrap(managed.first { $0.canonicalName == "Bench Press" })
         XCTAssertEqual(bench.usageCount, 2)
         XCTAssertFalse(bench.isCustom)
-        XCTAssertEqual(managed.count, 89)
+        XCTAssertEqual(managed.count, 94)
     }
 }

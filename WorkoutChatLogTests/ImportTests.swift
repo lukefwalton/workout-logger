@@ -81,7 +81,7 @@ final class ImportTests: XCTestCase {
         XCTAssertEqual(preview.addedSessions, 1)
         XCTAssertEqual(preview.addedExercises, 1)
         XCTAssertEqual(try fresh.sessionCount(), 0, "a dry-run writes nothing")
-        XCTAssertEqual(try fresh.exerciseCount(), 89, "…not even the custom exercise")
+        XCTAssertEqual(try fresh.exerciseCount(), 94, "…not even the custom exercise")
     }
 
     func testMalformedFileFailsCleanly() throws {
