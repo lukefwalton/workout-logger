@@ -193,7 +193,12 @@ final class TodayModel: ObservableObject {
 
     var canSave: Bool {
         guard let pending else { return false }
-        return !pendingExerciseName.trimmingCharacters(in: .whitespaces).isEmpty && !pending.sets.isEmpty
+        guard !pendingExerciseName.trimmingCharacters(in: .whitespaces).isEmpty,
+              !pending.sets.isEmpty else { return false }
+        // Reps are now editable on the confirm card (a recovered name-only draft
+        // starts with reps unset = 0), so gate Save on every set having a valid
+        // rep count instead of letting the save fail validation after the fact.
+        return pending.sets.allSatisfy { WorkoutValidator.repsRange.contains($0.reps) }
     }
 
     var selectedPlannedExercise: PlannedExercise? {
@@ -318,6 +323,21 @@ final class TodayModel: ObservableObject {
             }
 
         case .declined(let reason):
+            // Graceful fallback: the parser couldn't read a full set, but if the
+            // line clearly names a known exercise ("oh press", "leg press") we'd
+            // rather drop into a fillable draft than throw up a "couldn't read
+            // that" wall. The user fills in reps/weight on the confirm card.
+            if let recovered = recoveredNameOnlyDraft(from: input) {
+                let planned = applySelectedPlannedExerciseIfNeeded(to: recovered.sets)
+                pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: planned.sets)
+                pendingPlannedExerciseID = planned.loggedRowID
+                pendingParseSource = nil   // neither grammar nor FM produced this; it's a name recovery
+                refreshPendingExerciseResolution()
+                clearClarificationState()
+                lastDeclineReason = nil
+                status = .idle
+                return
+            }
             pending = nil
             clearPendingResolutionHints()
             pendingParseSource = nil
@@ -326,6 +346,34 @@ final class TodayModel: ObservableObject {
             lastDeclineReason = reason
             status = .declined
         }
+    }
+
+    /// When a parse declines, try to recover the leading text as a recognized
+    /// exercise so the user gets an editable draft (reps/weight unset) instead of
+    /// a hard decline. Confident recognition only: an exact/alias resolve, or a
+    /// high-confidence fuzzy match — anything weaker stays a decline so genuine
+    /// non-workout prose ("did a great workout") isn't turned into a phantom set.
+    private func recoveredNameOnlyDraft(from input: String) -> WorkoutDraft? {
+        let name = TodayInputTokenizer.leadingNamePrefix(input)
+        guard name.count >= 2 else { return nil }
+
+        let recognizedName: String?
+        if ((try? store.resolveExercise(name)) ?? nil) != nil {
+            recognizedName = name   // exact or alias hit; the store resolves it again on save
+        } else if let best = (try? store.suggestExercisesFuzzy(for: name, limit: 1))?.first,
+                  best.score >= WorkoutStore.semanticEscalationThreshold {
+            recognizedName = best.canonicalName
+        } else {
+            recognizedName = nil
+        }
+        guard let exerciseName = recognizedName else { return nil }
+
+        // reps = 0 is the "unset" sentinel: it fails `WorkoutValidator.repsRange`,
+        // so `canSave` stays false until the user fills reps in on the card.
+        let set = SetDraft(exerciseName: exerciseName, weight: 0,
+                           unit: UnitPreferences.current(), loadKind: .unspecified,
+                           reps: 0, rir: nil, setType: .working, notes: nil, sourceText: input)
+        return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [set])
     }
 
     private func clearClarificationState() {
@@ -365,6 +413,58 @@ final class TodayModel: ObservableObject {
             }
         }
         pending = draft
+    }
+
+    /// The pending entry's shared rep count, or nil when it hasn't been set yet
+    /// (a recovered name-only draft, where the parser couldn't read reps). nil
+    /// renders as an empty field so the user fills it in rather than seeing a
+    /// misleading "0".
+    var pendingReps: Int? {
+        let reps = pending?.sets.first?.reps ?? 0
+        return reps > 0 ? reps : nil
+    }
+
+    /// Let the confirm step fill in (or correct) the rep count for a draft the
+    /// parser couldn't fully read. Applied to every set in the entry, mirroring
+    /// the shared weight field — one entry is one exercise. nil clears it back to
+    /// the unset sentinel so Save re-disables.
+    func setReps(_ reps: Int?) {
+        guard var draft = pending else { return }
+        let value = max(0, reps ?? 0)
+        for index in draft.sets.indices {
+            draft.sets[index].reps = value
+        }
+        pending = draft
+    }
+
+    /// Append a set to the pending entry by duplicating the last one, so the new
+    /// set inherits the weight/reps/unit/load the user has already dialed in.
+    func addSet() {
+        guard var draft = pending, let template = draft.sets.last else { return }
+        draft.sets.append(SetDraft(exerciseName: template.exerciseName,
+                                   weight: template.weight,
+                                   unit: template.unit,
+                                   loadKind: template.loadKind,
+                                   reps: template.reps,
+                                   rir: template.rir,
+                                   setType: template.setType,
+                                   notes: template.notes,
+                                   sourceText: template.sourceText))
+        pending = draft
+    }
+
+    /// Drop the last set. Keeps at least one — an entry with zero sets isn't a
+    /// workout, and `removeSet` is the inverse of `addSet`, not a discard.
+    func removeSet() {
+        guard var draft = pending, draft.sets.count > 1 else { return }
+        draft.sets.removeLast()
+        pending = draft
+    }
+
+    /// The number of sets in the pending entry, for the +/- stepper on the
+    /// confirm card.
+    var pendingSetCount: Int {
+        pending?.sets.count ?? 0
     }
 
     /// The pending entry's shared unit (the parser emits one unit per entry).

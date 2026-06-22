@@ -82,6 +82,70 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(session.weight, 135, "the confirmed weight, not the placeholder 0, is stored")
     }
 
+    func testDeclineRecoversFillableDraftForKnownExercise() async throws {
+        // No reps/weight, just a recognizable lift — recover into an editable
+        // draft instead of a hard decline so the user can fill reps in.
+        model.inputText = "leg press"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertNil(model.lastDeclineReason)
+        XCTAssertEqual(model.pending?.sets.count, 1)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "leg press")
+        XCTAssertNil(model.pendingReps, "reps start unset so the user fills them in")
+        XCTAssertFalse(model.canSave, "a draft with no reps can't be saved yet")
+
+        model.setReps(10)
+        XCTAssertEqual(model.pendingReps, 10)
+        XCTAssertTrue(model.canSave)
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        let stored = try XCTUnwrap(try store.sets(inSession: 1).first)
+        XCTAssertEqual(stored.reps, 10)
+    }
+
+    func testDeclineRecoversThroughAlias() async {
+        // "ohp" is a seeded alias for Overhead Press — the alias path recovers too.
+        model.inputText = "ohp"
+        await model.parse()
+        XCTAssertEqual(model.pending?.sets.count, 1)
+        XCTAssertFalse(model.pendingExerciseName.isEmpty)
+        XCTAssertFalse(model.canSave)
+    }
+
+    func testNonWorkoutProseStillDeclines() async {
+        // The recovery must not turn genuine prose into a phantom set.
+        model.inputText = "did a great workout"
+        await model.parse()
+        XCTAssertNil(model.pending)
+        XCTAssertEqual(model.status, .declined)
+    }
+
+    func testRepsClearingReDisablesSave() async {
+        model.inputText = "squat 3x10"
+        await model.parse()
+        model.setExerciseName("Back Squat")
+        XCTAssertTrue(model.canSave)
+        model.setReps(nil)
+        XCTAssertFalse(model.canSave, "clearing reps re-disables Save")
+        XCTAssertEqual(model.pending?.sets.allSatisfy { $0.reps == 0 }, true)
+    }
+
+    func testAddAndRemoveSet() async {
+        model.inputText = "bench 135x8"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 1)
+
+        model.addSet()
+        XCTAssertEqual(model.pendingSetCount, 2)
+        XCTAssertEqual(model.pending?.sets.last?.reps, 8, "an added set copies the last one")
+        XCTAssertEqual(model.pending?.sets.last?.weight, 135)
+
+        model.removeSet()
+        XCTAssertEqual(model.pendingSetCount, 1)
+        model.removeSet()
+        XCTAssertEqual(model.pendingSetCount, 1, "never drops below one set")
+    }
+
     func testSaveSuccessClearsAndReports() async throws {
         model.inputText = "bench 135 for 8,8,7"
         await model.parse()

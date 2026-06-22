@@ -646,7 +646,7 @@
   {
     "slug": "leg_press",
     "canonical_name": "Leg Press",
-    "family_key": null,
+    "family_key": "leg_press",
     "primary_muscle": "quadriceps",
     "secondary_muscles": [
       "glutes",
@@ -655,6 +655,24 @@
     "aliases": [
       "leg press machine",
       "leg presses"
+    ]
+  },
+  {
+    "slug": "angled_leg_press",
+    "canonical_name": "Angled Leg Press",
+    "family_key": "leg_press",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "angled leg press",
+      "45 degree leg press",
+      "45 leg press",
+      "incline leg press",
+      "sled leg press",
+      "plate loaded leg press"
     ]
   },
   {
