@@ -16,8 +16,8 @@ final class SeedExercisesTests: XCTestCase {
         try ExerciseSeed.load(from: Bundle(for: Self.self))
     }
 
-    func testSeedLoadsNinetyLifts() throws {
-        XCTAssertEqual(try loadSeeds().count, 90)
+    func testSeedLoadsNinetyFourLifts() throws {
+        XCTAssertEqual(try loadSeeds().count, 94)
     }
 
     func testCanonicalNamesAreUnique() throws {

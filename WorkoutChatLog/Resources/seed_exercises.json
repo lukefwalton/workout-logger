@@ -394,6 +394,55 @@
     ]
   },
   {
+    "slug": "stiff_legged_deadlift",
+    "canonical_name": "Stiff-Legged Deadlift",
+    "family_key": "deadlift",
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "glutes",
+      "lower back"
+    ],
+    "aliases": [
+      "stiff legged deadlift",
+      "stiff-leg deadlift",
+      "stiff leg deadlift",
+      "sldl",
+      "straight leg deadlift",
+      "straight-leg deadlift"
+    ]
+  },
+  {
+    "slug": "good_morning",
+    "canonical_name": "Good Morning",
+    "family_key": null,
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "glutes",
+      "lower back"
+    ],
+    "aliases": [
+      "good mornings",
+      "barbell good morning"
+    ]
+  },
+  {
+    "slug": "glute_ham_raise",
+    "canonical_name": "Glute Ham Raise",
+    "family_key": null,
+    "primary_muscle": "hamstrings",
+    "secondary_muscles": [
+      "glutes",
+      "calves"
+    ],
+    "aliases": [
+      "ghr",
+      "glute ham raise",
+      "glute-ham raise",
+      "glute ham raises",
+      "ghd raise"
+    ]
+  },
+  {
     "slug": "sumo_deadlift",
     "canonical_name": "Sumo Deadlift",
     "family_key": "deadlift",
@@ -423,7 +472,9 @@
       "pullup",
       "pull up",
       "pullups",
-      "pull-ups"
+      "pull-ups",
+      "weighted pull-up",
+      "weighted pullup"
     ]
   },
   {
@@ -439,7 +490,9 @@
       "chinup",
       "chin up",
       "chinups",
-      "chin-ups"
+      "chin-ups",
+      "rack chins",
+      "rack chin-up"
     ]
   },
   {
@@ -455,7 +508,9 @@
       "pulldown",
       "lat pulldowns",
       "lat pull down",
-      "pulldowns"
+      "pulldowns",
+      "close grip pulldown",
+      "close-grip lat pulldown"
     ]
   },
   {
@@ -628,6 +683,19 @@
       "back squats",
       "high bar squat",
       "bb squat"
+    ]
+  },
+  {
+    "slug": "box_squat",
+    "canonical_name": "Box Squat",
+    "family_key": "squat",
+    "primary_muscle": "quadriceps",
+    "secondary_muscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "aliases": [
+      "box squats"
     ]
   },
   {
