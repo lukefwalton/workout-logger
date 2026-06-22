@@ -327,7 +327,12 @@ final class TodayModel: ObservableObject {
             // line clearly names a known exercise ("oh press", "leg press") we'd
             // rather drop into a fillable draft than throw up a "couldn't read
             // that" wall. The user fills in reps/weight on the confirm card.
-            if let recovered = recoveredNameOnlyDraft(from: input) {
+            //
+            // Only when the decline is *generic* (no specific diagnosis): a
+            // concrete reason — rep range, cardio, two exercises, incomplete
+            // weight — is a more useful signal than a blank name-only draft, so
+            // it's left to surface its own status card.
+            if reason == nil, let recovered = recoveredNameOnlyDraft(from: input) {
                 let planned = applySelectedPlannedExerciseIfNeeded(to: recovered.sets)
                 pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: planned.sets)
                 pendingPlannedExerciseID = planned.loggedRowID
@@ -415,13 +420,23 @@ final class TodayModel: ObservableObject {
         pending = draft
     }
 
+    /// Whether every set in the pending entry shares one rep count. The shared
+    /// Reps editor is only safe to show when they do (including the all-unset
+    /// recovery case) — a parsed entry with uneven reps like 8,8,7 would be
+    /// silently flattened by one shared field, so the card hides it and leaves
+    /// the per-set summary as the source of truth.
+    var pendingRepsAreUniform: Bool {
+        guard let sets = pending?.sets, let first = sets.first?.reps else { return false }
+        return sets.allSatisfy { $0.reps == first }
+    }
+
     /// The pending entry's shared rep count, or nil when it hasn't been set yet
-    /// (a recovered name-only draft, where the parser couldn't read reps). nil
-    /// renders as an empty field so the user fills it in rather than seeing a
-    /// misleading "0".
+    /// (a recovered name-only draft, where the parser couldn't read reps) or when
+    /// the sets have uneven reps. nil renders as an empty field so the user fills
+    /// it in rather than seeing a misleading "0".
     var pendingReps: Int? {
-        let reps = pending?.sets.first?.reps ?? 0
-        return reps > 0 ? reps : nil
+        guard pendingRepsAreUniform, let reps = pending?.sets.first?.reps, reps > 0 else { return nil }
+        return reps
     }
 
     /// Let the confirm step fill in (or correct) the rep count for a draft the

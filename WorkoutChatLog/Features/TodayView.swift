@@ -561,20 +561,26 @@ struct TodayView: View {
                     }
                     .fieldPill()
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Reps")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Theme.steel)
-                        TextField("Add reps", value: Binding(get: { model.pendingReps },
-                                                             set: model.setReps),
-                                  format: .number)
-                            .font(.headline)
-                            .textFieldStyle(.plain)
-                            .keyboardType(.numberPad)
-                            .accessibilityLabel("Reps per set")
+                    // Shared reps editor — shown only when every set carries the
+                    // same rep count (or none do yet), so a parsed uneven entry
+                    // like 8,8,7 isn't flattened by one field. Uneven drafts keep
+                    // their per-set summary below as the source of truth.
+                    if model.pendingRepsAreUniform {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Reps")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Theme.steel)
+                            TextField("Add reps", value: Binding(get: { model.pendingReps },
+                                                                 set: model.setReps),
+                                      format: .number)
+                                .font(.headline)
+                                .textFieldStyle(.plain)
+                                .keyboardType(.numberPad)
+                                .accessibilityLabel("Reps per set")
+                        }
+                        .fieldPill()
                     }
-                    .fieldPill()
 
                     // Plate calculator (§4): barbell loads only. Gated to `.external`
                     // so it never appears for bodyweight-plus / assisted entries, where

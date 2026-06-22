@@ -146,6 +146,24 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.pendingSetCount, 1, "never drops below one set")
     }
 
+    func testUnevenRepsDraftDoesNotExposeSharedRepsField() async {
+        // A parsed entry with distinct per-set reps must not surface the shared
+        // Reps editor, which would flatten 8,8,7 to one value on edit.
+        model.inputText = "bench 135 for 8,8,7"
+        await model.parse()
+        XCTAssertEqual(model.pending?.sets.map { $0.reps }, [8, 8, 7])
+        XCTAssertFalse(model.pendingRepsAreUniform)
+        XCTAssertNil(model.pendingReps, "no single value describes an uneven draft")
+        XCTAssertTrue(model.canSave, "uneven reps are all valid, so Save stays enabled")
+    }
+
+    func testUniformRepsDraftExposesSharedRepsField() async {
+        model.inputText = "squat 3x10"
+        await model.parse()
+        XCTAssertTrue(model.pendingRepsAreUniform)
+        XCTAssertEqual(model.pendingReps, 10)
+    }
+
     func testSaveSuccessClearsAndReports() async throws {
         model.inputText = "bench 135 for 8,8,7"
         await model.parse()

@@ -40,10 +40,10 @@ final class WorkoutStoreTests: XCTestCase {
 
     func testSeedingLoadsTheLibraryOnce() throws {
         try seed()
-        XCTAssertEqual(try store.exerciseCount(), 89)
+        XCTAssertEqual(try store.exerciseCount(), 94)
         try seed()  // reseed upserts on slug — idempotent, no duplicate rows
         try seed()
-        XCTAssertEqual(try store.exerciseCount(), 89)
+        XCTAssertEqual(try store.exerciseCount(), 94)
     }
 
     func testEverySeedAliasResolvesToExactlyOneExercise() throws {
@@ -277,7 +277,7 @@ final class WorkoutStoreTests: XCTestCase {
         }
         XCTAssertEqual(try store.sessionCount(), 0)
         XCTAssertEqual(try store.setCount(), 0)
-        XCTAssertEqual(try store.exerciseCount(), 89, "no junk exercise row created")
+        XCTAssertEqual(try store.exerciseCount(), 94, "no junk exercise row created")
     }
 
     // MARK: - Exercise resolution cascade
@@ -295,7 +295,7 @@ final class WorkoutStoreTests: XCTestCase {
         let b = try store.resolveExercise("bench press")
         XCTAssertNotNil(a)
         XCTAssertEqual(a, b)
-        XCTAssertEqual(try store.exerciseCount(), 89, "lookup never creates a row")
+        XCTAssertEqual(try store.exerciseCount(), 94, "lookup never creates a row")
     }
 
     func testLookupByAlias() throws {
@@ -305,7 +305,7 @@ final class WorkoutStoreTests: XCTestCase {
 
         let rdl = try XCTUnwrap(store.resolveExercise("rdl"))
         XCTAssertEqual(try store.exercise(id: rdl)?.canonicalName, "Romanian Deadlift")
-        XCTAssertEqual(try store.exerciseCount(), 89, "aliases resolve to existing lifts")
+        XCTAssertEqual(try store.exerciseCount(), 94, "aliases resolve to existing lifts")
     }
 
     func testResolutionCollapsesWhitespace() throws {
@@ -314,14 +314,14 @@ final class WorkoutStoreTests: XCTestCase {
         let messy = try store.resolveExercise("  bench   press ")
         XCTAssertNotNil(tidy)
         XCTAssertEqual(tidy, messy, "internal/edge whitespace collapses to one lift")
-        XCTAssertEqual(try store.exerciseCount(), 89, "no near-duplicate created")
+        XCTAssertEqual(try store.exerciseCount(), 94, "no near-duplicate created")
     }
 
     func testCreatingCollapsesWhitespace() throws {
         try seed()
         _ = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
                                         sets: [makeSet("custom   lift")]))
-        XCTAssertEqual(try store.exerciseCount(), 90)
+        XCTAssertEqual(try store.exerciseCount(), 95)
         let id = try XCTUnwrap(store.resolveExercise("custom lift"))
         XCTAssertEqual(try store.exercise(id: id)?.canonicalName, "custom lift",
                        "new lifts are stored whitespace-collapsed")
@@ -335,7 +335,7 @@ final class WorkoutStoreTests: XCTestCase {
 
         let first = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
                                                 sets: [makeSet("Jefferson Curl")]))
-        XCTAssertEqual(try store.exerciseCount(), 90)
+        XCTAssertEqual(try store.exerciseCount(), 95)
         let createdID = try XCTUnwrap(store.resolveExercise("jefferson curl"))
         XCTAssertNil(try store.exercise(id: createdID)?.primaryMuscle,
                      "an unknown lift is created muscle-less for the user to correct")
@@ -344,7 +344,7 @@ final class WorkoutStoreTests: XCTestCase {
         // Saving it again reuses the row — no duplicate.
         _ = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
                                         sets: [makeSet("Jefferson Curl")]))
-        XCTAssertEqual(try store.exerciseCount(), 90, "no duplicate exercise row")
+        XCTAssertEqual(try store.exerciseCount(), 95, "no duplicate exercise row")
     }
 
     func testAddExerciseCreatesLocalRegistryEntryAndReusesDuplicates() throws {
@@ -352,12 +352,12 @@ final class WorkoutStoreTests: XCTestCase {
 
         let first = try store.addExercise(named: "  Jefferson   Curl ")
 
-        XCTAssertEqual(try store.exerciseCount(), 90)
+        XCTAssertEqual(try store.exerciseCount(), 95)
         XCTAssertEqual(try store.exercise(id: first)?.canonicalName, "Jefferson Curl")
 
         let second = try store.addExercise(named: "jefferson curl")
         XCTAssertEqual(second, first)
-        XCTAssertEqual(try store.exerciseCount(), 90, "manual add reuses exact existing exercises")
+        XCTAssertEqual(try store.exerciseCount(), 95, "manual add reuses exact existing exercises")
     }
 
     func testAddExerciseRejectsBlankName() throws {
@@ -366,7 +366,7 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertThrowsError(try store.addExercise(named: "   ")) {
             XCTAssertEqual($0 as? ParseError, .emptyExerciseName)
         }
-        XCTAssertEqual(try store.exerciseCount(), 89)
+        XCTAssertEqual(try store.exerciseCount(), 94)
     }
 
     // MARK: - Share/export reads
