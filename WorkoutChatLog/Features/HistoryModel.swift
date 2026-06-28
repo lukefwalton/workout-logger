@@ -106,7 +106,17 @@ final class HistoryModel: ObservableObject {
                 }
                 let sections = Self.computeSections(rows: rows, spans: spans,
                                                     bodyweightKg: bodyweight, policy: currentPolicy)
-                let cardio = (try? store.cardioEntries()) ?? []
+                let cardio: [CardioEntry]
+                do {
+                    cardio = try store.cardioEntries()
+                } catch {
+                    // Don't blank strength history over a cardio-only read failure,
+                    // but don't hide it either — surface in DEBUG like sessionSetSpans.
+                    #if DEBUG
+                    print("[HistoryModel] cardioEntries failed: \(error)")
+                    #endif
+                    cardio = []
+                }
                 return (sections, cardio)
             }.value
             // A newer `load()` has run since this one started — drop the stale

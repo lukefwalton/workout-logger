@@ -947,6 +947,16 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.pendingExerciseName.lowercased(), "leg ext")
     }
 
+    func testAmbiguousActivityWordRecoversAsStrengthNotCardio() async {
+        // "row 135" is a barbell row at 135 lb — it must NOT become a 135-minute
+        // rowing bout. Recovers as an editable strength draft instead.
+        model.inputText = "row 135"
+        await model.parse()
+        XCTAssertNil(model.pendingCardio, "an ambiguous lift word + bare weight is strength, not cardio")
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "row")
+    }
+
     func testWeightInTripleRecovers() async {
         // "leg curl 8x160x3" → 160 load, 8 reps, 3 sets.
         model.inputText = "leg curl 8x160x3"

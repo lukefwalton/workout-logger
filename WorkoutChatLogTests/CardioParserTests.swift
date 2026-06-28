@@ -103,6 +103,25 @@ final class CardioParserTests: XCTestCase {
         XCTAssertNil(parse("ski squat 135"))
     }
 
+    func testAmbiguousActivityWordWithBareNumberIsStrength() {
+        // "row" doubles as a barbell lift — "row 135" is 135 lb, not a 135-minute
+        // row. Without an explicit duration/distance it stays strength.
+        XCTAssertNil(parse("row 135"))
+        XCTAssertNil(parse("row 135 lb"))
+        XCTAssertNil(parse("row 95 x 10"))
+    }
+
+    func testWeightUnitForcesStrength() {
+        XCTAssertNil(parse("bench 135 lb"))
+        XCTAssertNil(parse("squat 60kg"))
+    }
+
+    func testAmbiguousActivityStillCardioWithExplicitMetric() throws {
+        // With a real duration/distance, "row" is unambiguously the cardio kind.
+        XCTAssertEqual(try XCTUnwrap(parse("row 20 min")).activity, "Rowing")
+        XCTAssertEqual(try XCTUnwrap(parse("rowing 5k")).distanceUnit, .km)
+    }
+
     func testNonWorkoutProseIsNotCardio() {
         XCTAssertNil(parse("did a great workout"))
         XCTAssertNil(parse(""))

@@ -26,6 +26,10 @@ enum CardioParser {
         guard !original.isEmpty else { return nil }
         let lower = original.lowercased().replacingOccurrences(of: "×", with: "x")
 
+        // A barbell unit means strength, full stop — cardio never carries lb/kg.
+        // Kills "row 135 lb", "bench 135 lb", etc. before any activity guess.
+        if containsWeightUnit(lower) { return nil }
+
         let duration = parseDuration(lower)
         let distance = parseDistance(lower)
         let match = matchActivity(in: lower)
@@ -35,13 +39,15 @@ enum CardioParser {
         // strength path rather than invent a bout.
         guard hasMetric || match != nil else { return nil }
 
-        // Without an explicit duration/distance, only commit to cardio when the
-        // line is essentially just the activity (+ an optional number) — so a
-        // strength move that merely *contains* a cardio word ("walking lunge 20",
-        // "ski squat 135") isn't mis-filed as cardio. An explicit metric is a
-        // strong enough signal to accept extra words ("rowing intervals 30 min").
+        // Without an explicit duration/distance, commit to cardio only on a *strong*
+        // signal: an activity matched via a keyword that doesn't double as a barbell
+        // lift. "row" is the trap — "row 135" means 135 lb, not a 135-minute row, so
+        // an ambiguous word alone (no "min"/distance) stays strength. Unambiguous
+        // words ("bike", "elliptical", "rowing") still log without a unit. A foreign
+        // exercise word ("walking lunge", "ski squat") also bails.
         if !hasMetric {
-            guard let match, !hasForeignWords(lower, matched: match) else { return nil }
+            guard let strong = matchActivity(in: lower, excluding: Self.ambiguousActivityWords),
+                  !hasForeignWords(lower, matched: strong) else { return nil }
         }
 
         // Best-effort: a lone "<activity> 30" with no unit is minutes.
@@ -79,13 +85,26 @@ enum CardioParser {
         return false
     }
 
-    private static func matchActivity(in lower: String) -> CardioActivity? {
+    /// Keywords that double as common barbell lifts, so on their own (no explicit
+    /// duration/distance) they should NOT pull a line into cardio.
+    private static let ambiguousActivityWords: Set<String> = ["row", "rows", "rower"]
+
+    private static func matchActivity(in lower: String, excluding: Set<String> = []) -> CardioActivity? {
         for activity in CardioActivity.allCases {
-            for keyword in activity.keywords where containsWholeWords(lower, keyword) {
+            for keyword in activity.keywords where !excluding.contains(keyword) && containsWholeWords(lower, keyword) {
                 return activity
             }
         }
         return nil
+    }
+
+    /// Whether a barbell weight unit (lb/kg, spaced or glued) appears — the tell
+    /// that a line is strength, not cardio.
+    private static func containsWeightUnit(_ lower: String) -> Bool {
+        for unit in ["lb", "lbs", "kg", "kgs", "pound", "pounds", "kilo", "kilos"] where containsWholeWords(lower, unit) {
+            return true
+        }
+        return lower.range(of: #"[0-9](lb|lbs|kg|kgs)\b"#, options: .regularExpression) != nil
     }
 
     /// The display name for the bout: the matched canonical, else the user's own

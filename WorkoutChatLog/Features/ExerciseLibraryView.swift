@@ -52,6 +52,7 @@ struct ExerciseLibraryView: View {
         }
     }
 
+    @MainActor
     private func row(_ exercise: ManagedExercise) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
