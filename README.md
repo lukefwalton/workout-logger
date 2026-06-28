@@ -3,8 +3,8 @@
 > **No subscription. No cloud. No tracking.**
 
 A local-first iOS workout tracker — shorthand logging, on-device parsing, progress
-charts, and optional HealthKit. **[$4.99 — product page](https://lukefwalton.com/private-workout-logger/)**
-(App Store · in review · no subscription).
+charts, and optional HealthKit. **[$4.99 on the App Store](https://apps.apple.com/us/app/private-workout-logger/id6782669888)**
+(no subscription) · [product page](https://lukefwalton.com/private-workout-logger/).
 
 ## Support
 
@@ -45,8 +45,10 @@ from day one, well before any model is wired up.
 
 ## Status
 
-**v1.0** — in App Store review (June 2026). [`docs/learnings/`](docs/learnings/)
-records what each build step taught us along the way.
+**v1.0** — [live on the App Store](https://apps.apple.com/us/app/private-workout-logger/id6782669888)
+(June 2026). **v1.0.1** (build 4) in prep — parser and gym-logging fixes from
+post-launch testing. [`docs/learnings/`](docs/learnings/) records what each build
+step taught us; see [024 — App Store shipped](docs/learnings/024-app-store-shipped.md).
 
 Shipped in v1.0:
 - XcodeGen project (app + widget + unit-test targets), SwiftUI four-tab shell
@@ -98,10 +100,10 @@ at launch), and, later, optional Camera. Register the App Group and enable
 HealthKit for your team in the Apple Developer portal. There is still no server, no
 account, and no tracking.
 
-> **v1.2 is a clean schema reset.** If you ran an earlier local build, delete the
-> app (or wipe its App Group container) before launching this one. The app has
-> never shipped, so there is nothing to migrate — a pre-v1.2 database is rejected
-> at launch with a clear reset message rather than being silently mis-read.
+> **Schema note:** v1.0 shipped with the v1.2 identity schema. If you ran a
+> pre-release TestFlight build from before that reset, delete the app (or wipe its
+> App Group container) before installing the App Store build — a pre-v1.2 database
+> is rejected at launch with a clear reset message rather than being silently mis-read.
 
 Run the unit tests with `⌘U`, or:
 
