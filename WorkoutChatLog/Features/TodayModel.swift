@@ -383,13 +383,13 @@ final class TodayModel: ObservableObject {
         let name = TodayInputTokenizer.leadingNamePrefix(input)
 
         // Ambiguous triple form ("8x3x4"): best-effort A sets × B reps, weight left
-        // unspecified. The dropped third number and the sets/reps split are exactly
-        // what the confirm card's swap control and editable fields are for.
+        // unspecified. The explicit AxBxC structure is itself proof of a logging
+        // attempt, so it recovers on its own — an empty name just becomes a bare
+        // scheme the user names, exactly like "3x10". The dropped third number and
+        // the sets/reps split are what the swap control and editable fields fix.
         if reason == .ambiguousTripleX, let triple = Self.ambiguousTripleCounts(in: input) {
-            let exerciseName = recoveredExerciseName(from: name) ?? name
-            guard !exerciseName.isEmpty else { return nil }
             let sets = (0..<triple.sets).map { _ in
-                SetDraft(exerciseName: exerciseName, weight: 0,
+                SetDraft(exerciseName: name, weight: 0,
                          unit: UnitPreferences.current(), loadKind: .unspecified,
                          reps: triple.reps, rir: nil, setType: .working,
                          notes: nil, sourceText: input)
@@ -401,40 +401,39 @@ final class TodayModel: ObservableObject {
         // attempt, so it recovers even when the exercise is a brand-new lift the
         // library has never seen — that becomes a custom workout, not a wall.
         let weight = Self.trailingConfidentWeight(in: input)
-
-        let exerciseName: String
-        if let recognized = recoveredExerciseName(from: name) {
-            exerciseName = recognized
-        } else if weight != nil, name.count >= 2 {
-            exerciseName = name        // unknown lift + a real weight → a new custom exercise
-        } else {
+        guard isRecoverableExercise(name, hasWeight: weight != nil) else {
             // No recognizable lift and no weight to anchor on → genuine prose like
             // "did a great workout". Decline cleanly rather than invent a set.
             return nil
         }
-        guard !exerciseName.isEmpty else { return nil }
 
         let load = weight ?? 0
         // reps = 0 is the "unset" sentinel: it fails `WorkoutValidator.repsRange`,
-        // so `canSave` stays false until the user fills reps in on the card.
-        let set = SetDraft(exerciseName: exerciseName, weight: load,
+        // so `canSave` stays false until the user fills reps in on the card. We draft
+        // with the *typed* name and let `refreshPendingExerciseResolution` propose
+        // near-neighbors / a new-exercise notice — never a silent rename.
+        let set = SetDraft(exerciseName: name, weight: load,
                            unit: UnitPreferences.current(),
                            loadKind: load > 0 ? .external : .unspecified,
                            reps: 0, rir: nil, setType: .working, notes: nil, sourceText: input)
         return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [set])
     }
 
-    /// Resolve a leading name span to a confident exercise: an exact/alias hit
-    /// (returned verbatim so the store re-resolves it on save) or a high-confidence
-    /// fuzzy match (returned as the canonical). nil for anything weaker.
-    private func recoveredExerciseName(from name: String) -> String? {
-        guard name.count >= 2 else { return nil }
-        if ((try? store.resolveExercise(name)) ?? nil) != nil { return name }
+    /// Whether a declined line's leading text is a plausible exercise worth
+    /// recovering into a draft — rather than prose we'd be inventing a set from.
+    /// True when a confident weight anchors it as a log, the name resolves
+    /// (exact/alias), or it fuzzily resembles a known lift. Recovery always drafts
+    /// with the *typed* name and lets the confirm card propose near-neighbors, so
+    /// this only gates *whether* to recover, never *what to rename to*.
+    private func isRecoverableExercise(_ name: String, hasWeight: Bool) -> Bool {
+        guard name.count >= 2 else { return false }
+        if hasWeight { return true }
+        if ((try? store.resolveExercise(name)) ?? nil) != nil { return true }
         if let best = (try? store.suggestExercisesFuzzy(for: name, limit: 1))?.first,
            best.score >= WorkoutStore.semanticEscalationThreshold {
-            return best.canonicalName
+            return true
         }
-        return nil
+        return false
     }
 
     /// The trailing token read as a *confident* weight — a number with an explicit
