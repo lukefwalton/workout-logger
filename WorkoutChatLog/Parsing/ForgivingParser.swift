@@ -56,6 +56,7 @@ enum ForgivingParser {
             let parsed = interpretXChain(chain.values, defaultUnit: defaultUnit)
             weight = parsed.weight; unit = parsed.unit
             setCount = parsed.setCount; reps = parsed.reps
+            if parsed.bodyweight { loadIsBodyweight = true; weight = 0 }
         }
 
         // ── 2. Explicit weight elsewhere: "135lb", "60 kg", "@135", "bw" ──
@@ -153,13 +154,18 @@ enum ForgivingParser {
     /// carrying a unit — or, failing that, the one too large to be a count — is
     /// the weight; the remaining numbers are reps (earlier) and sets (later).
     private static func interpretXChain(_ values: [String], defaultUnit: WeightUnit)
-        -> (weight: Double?, unit: WeightUnit?, setCount: Int?, reps: [Int]) {
+        -> (weight: Double?, unit: WeightUnit?, setCount: Int?, reps: [Int], bodyweight: Bool) {
         let parsed = values.map { weightToken($0) }
         let nums = parsed.map { $0?.weight ?? 0 }
+        // An explicit "bw"/"bodyweight" in the chain is the load slot, not a count
+        // — "chin up bw x 8 x 3" is 3 bodyweight sets of 8, not a numeric triple.
+        let bwIdx = values.firstIndex(where: { isBodyweightToken($0) })
 
         if values.count >= 3 {
-            // Pick the weight slot: a unit'd number, else the first one > a plausible count.
-            let weightIdx = parsed.firstIndex(where: { $0?.unit != nil })
+            // Weight slot: explicit bw, else a unit'd number, else the first one
+            // too large to be a count.
+            let weightIdx = bwIdx
+                ?? parsed.firstIndex(where: { $0?.unit != nil })
                 ?? nums.firstIndex(where: { $0 > Double(DeterministicParser.maxPlausibleSetCount) })
             if let wi = weightIdx {
                 let others = values.indices.filter { $0 != wi }
@@ -174,24 +180,30 @@ enum ForgivingParser {
                     repVal = Int(nums[others[0]]); setVal = Int(nums[others[1]])
                 }
                 let reps = validReps(repVal) ? [repVal] : []
-                return (nums[wi], parsed[wi]?.unit ?? defaultUnit,
-                        (1...99).contains(setVal) ? setVal : nil, reps)
+                let isBW = wi == bwIdx
+                return (isBW ? 0 : nums[wi], isBW ? nil : (parsed[wi]?.unit ?? defaultUnit),
+                        (1...99).contains(setVal) ? setVal : nil, reps, isBW)
             }
             // All small, no unit ("5x5x5"): sets × reps, drop the genuinely
             // ambiguous third number.
             let setVal = Int(nums[0]); let repVal = Int(nums[1])
             return (nil, nil, (1...99).contains(setVal) ? setVal : nil,
-                    validReps(repVal) ? [repVal] : [])
+                    validReps(repVal) ? [repVal] : [], false)
         }
 
-        // Two numbers: "135x8" (weight×reps) vs "3x10" (sets×reps).
+        // Two numbers. An explicit bw makes the other the reps ("bw x 8" → 8 reps BW).
+        if let bw = bwIdx {
+            let repVal = Int(nums[bw == 0 ? 1 : 0])
+            return (0, nil, nil, validReps(repVal) ? [repVal] : [], true)
+        }
+        // "135x8" (weight×reps) vs "3x10" (sets×reps).
         let firstUnit = parsed[0]?.unit
         if firstUnit != nil || nums[0] > Double(DeterministicParser.maxPlausibleSetCount) {
             let repVal = Int(nums[1])
-            return (nums[0], firstUnit ?? defaultUnit, nil, validReps(repVal) ? [repVal] : [])
+            return (nums[0], firstUnit ?? defaultUnit, nil, validReps(repVal) ? [repVal] : [], false)
         }
         let setVal = Int(nums[0]); let repVal = Int(nums[1])
-        return (nil, nil, (1...99).contains(setVal) ? setVal : nil, validReps(repVal) ? [repVal] : [])
+        return (nil, nil, (1...99).contains(setVal) ? setVal : nil, validReps(repVal) ? [repVal] : [], false)
     }
 
     // MARK: - Token scanners

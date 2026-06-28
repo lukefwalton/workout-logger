@@ -78,6 +78,19 @@ final class ForgivingParserTests: XCTestCase {
         XCTAssertEqual(sets.first?.exerciseName, "")
     }
 
+    func testExplicitBodyweightChain() throws {
+        // "bw" is the load slot, not a count: "chin up bw x 8 x 3" = 3 BW sets of 8.
+        let triple = try XCTUnwrap(parse("chin up bw x 8 x 3"))
+        XCTAssertEqual(triple.count, 3)
+        XCTAssertTrue(triple.allSatisfy { $0.reps == 8 && $0.loadKind == .bodyweight && $0.weight == 0 })
+        XCTAssertEqual(triple.first?.exerciseName, "chin up")
+
+        let single = try XCTUnwrap(parse("pull up bw x 8"))
+        XCTAssertEqual(single.count, 1)
+        XCTAssertEqual(single.first?.reps, 8)
+        XCTAssertEqual(single.first?.loadKind, .bodyweight)
+    }
+
     func testBodyweightSchemeDefaultsToBodyweight() throws {
         let sets = try XCTUnwrap(parse("pushup 3x10"))
         XCTAssertEqual(sets.count, 3)

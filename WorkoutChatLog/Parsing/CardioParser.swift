@@ -96,10 +96,14 @@ enum CardioParser {
     private static let ambiguousActivityWords: Set<String> = ["row", "rows", "rower"]
 
     private static func matchActivity(in lower: String, excluding: Set<String> = []) -> CardioActivity? {
-        for activity in CardioActivity.allCases {
-            for keyword in activity.keywords where !excluding.contains(keyword) && containsWholeWords(lower, keyword) {
-                return activity
-            }
+        // Longest keyword first, so a specific multi-word phrase beats a shorter
+        // overlap: "ski erg" must win over rowing's bare "erg".
+        let candidates = CardioActivity.allCases
+            .flatMap { activity in activity.keywords.map { (activity: activity, keyword: $0) } }
+            .filter { !excluding.contains($0.keyword) }
+            .sorted { $0.keyword.count > $1.keyword.count }
+        for candidate in candidates where containsWholeWords(lower, candidate.keyword) {
+            return candidate.activity
         }
         return nil
     }

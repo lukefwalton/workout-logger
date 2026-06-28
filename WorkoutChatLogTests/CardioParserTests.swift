@@ -66,6 +66,15 @@ final class CardioParserTests: XCTestCase {
         XCTAssertEqual(mmss.durationSeconds, 1500) // 25 min
     }
 
+    func testSkiErgResolvesToSkiNotRowing() throws {
+        // "erg" alone is rowing, but the longer "ski erg" phrase must win.
+        let d = try XCTUnwrap(parse("ski erg 20 min"))
+        XCTAssertEqual(d.activity, "Ski Erg")
+        XCTAssertEqual(d.durationSeconds, 1200)
+        // bare "erg" is still the rower
+        XCTAssertEqual(try XCTUnwrap(parse("erg 20 min")).activity, "Rowing")
+    }
+
     func testCompoundDuration() throws {
         let d = try XCTUnwrap(parse("elliptical 1h 20min"))
         XCTAssertEqual(d.activity, "Elliptical")
