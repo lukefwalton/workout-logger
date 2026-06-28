@@ -1,5 +1,10 @@
 # App Store Review Notes — Private Workout Logger
 
+**Status:** v1.0 approved and released June 2026 —
+[App Store listing](https://apps.apple.com/us/app/private-workout-logger/id6782669888).
+Keep these notes for future updates; paste into App Store Connect → App Review
+Information → Notes when submitting a new version.
+
 These notes are for App Review (paste into App Store Connect → App Review
 Information → Notes). They explain the privacy-first design so the reviewer can
 exercise the whole app without friction.
