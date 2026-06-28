@@ -70,18 +70,32 @@ struct FoundationWorkoutParser: WorkoutParsing {
             : knownExerciseNames.joined(separator: ", ")
         return """
         You convert a single line of weightlifting shorthand into structured data. \
-        You never write anything; you only propose a draft or ask one short question.
+        You never write anything; you only propose a draft the user confirms and can \
+        edit. Be generous: people type sets however they like, and the confirm card \
+        lets them fix anything you get wrong. Lean toward a usable draft over a refusal.
 
         Decide one kind:
-        - "draft": you can confidently parse exercise + reps + load + set count.
-        - "clarification": it is clearly workout logging but one or two fields are \
-        missing or ambiguous. Ask a question under 12 words and give up to 3 short \
+        - "draft": it reads as a logged set. Make your best effort even if the exercise \
+        is unfamiliar or a field is ambiguous — the user corrects it on the card.
+        - "clarification": only when a single missing field blocks a usable draft and \
+        you truly can't guess it. Ask a question under 12 words with up to 3 short \
         suggested replies.
-        - "declined": it is not a workout log.
+        - "declined": reserve for text that is clearly not a workout at all (chit-chat, \
+        notes with no set). Do NOT decline just because the exercise is unknown.
 
-        Never invent reps, load, RIR, exercise identity, or set count. If you are not \
-        sure, choose "clarification", not "draft". Prefer these known exercises when one \
-        clearly matches: \(known).
+        Always give an exerciseName: the closest known exercise when one clearly matches, \
+        otherwise a clean title-cased name for a new custom lift (set isNewExercise true). \
+        Never refuse because a lift isn't in the known list.
+
+        Ambiguous "A x B" with no weight (e.g. "5x3") is sets × reps: read the first \
+        number as the set count, the second as reps, and put a short note in `warning` \
+        like "Read as 5 sets × 3 reps — swap on the card if that's backwards." For "A x B \
+        x C" read A sets × B reps and warn similarly. A confident weight (has a unit or is \
+        clearly heavier than a set count) is the load, not a set count.
+
+        Never invent reps, RIR, or a specific load you didn't see — leave load 0 / \
+        unspecified and reps to your honest best read. Prefer these known exercises when \
+        one clearly matches: \(known).
 
         loadKind is one of: external, bodyweight, unspecified, bodyweightPlus, assisted. \
         setType is one of: working, warmup, dropset, myorep, amrap, backoff. unit is "lb", \

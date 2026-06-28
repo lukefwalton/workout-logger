@@ -692,4 +692,102 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.status, .declined)
         XCTAssertNil(model.lastDeclineReason)
     }
+
+    // MARK: - Sets⇄reps swap + best-effort recovery
+
+    func testSwapSetsAndRepsReinterpretsAmbiguousScheme() async {
+        // "5x3" parses as a best guess of 5 sets × 3 reps; one tap flips it.
+        model.inputText = "5x3"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 5)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingCanSwapSetsReps)
+
+        model.swapSetsAndReps()
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 5)
+    }
+
+    func testSwapPreservesWeightAndName() async {
+        model.inputText = "squat 3x10 @ 135"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 10)
+
+        model.swapSetsAndReps()
+        XCTAssertEqual(model.pendingSetCount, 10)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertEqual(model.pending?.sets.allSatisfy { $0.weight == 135 }, true)
+        XCTAssertEqual(model.pendingExerciseName, "squat")
+    }
+
+    func testSwapIsHiddenForUnevenReps() async {
+        model.inputText = "bench 135 for 8,8,7"
+        await model.parse()
+        XCTAssertFalse(model.pendingCanSwapSetsReps, "uneven reps have no single value to swap")
+    }
+
+    func testSwapIsHiddenWhenSetsEqualReps() async {
+        model.inputText = "pullup 5x5"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 5)
+        XCTAssertEqual(model.pendingReps, 5)
+        XCTAssertFalse(model.pendingCanSwapSetsReps, "swapping 5×5 would be a no-op")
+    }
+
+    func testIncompleteWeightRecoversEditableDraft() async throws {
+        // "bench 135" — a weight with no reps used to dead-end. Now it recovers
+        // into a fillable draft: add reps and save.
+        model.inputText = "bench 135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertNil(model.lastDeclineReason)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertNil(model.pendingReps, "reps stay unset — recovery never fabricates them")
+        XCTAssertFalse(model.canSave)
+
+        model.setReps(8)
+        XCTAssertTrue(model.canSave)
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        let stored = try XCTUnwrap(try store.sets(inSession: 1).first)
+        XCTAssertEqual(stored.weight, 135)
+        XCTAssertEqual(stored.reps, 8)
+    }
+
+    func testUnknownExerciseWithWeightRecoversAsNewCustomExercise() async {
+        // An unfamiliar lift typed with a real load becomes a custom exercise,
+        // never a "we don't know that one" wall.
+        model.inputText = "frobnicator 135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "frobnicator")
+        XCTAssertTrue(model.pendingCreatesNewExercise, "an unknown lift recovers as a new custom exercise")
+        XCTAssertEqual(model.pendingWeight, 135)
+    }
+
+    func testAmbiguousTripleRecoversSwappableDraft() async {
+        // "8x3x4" is genuinely ambiguous; recover a best-effort 8 sets × 3 reps
+        // the user can swap, instead of a "please rephrase" wall.
+        model.inputText = "squat 8x3x4"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 8)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingCanSwapSetsReps)
+
+        model.swapSetsAndReps()
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 8)
+    }
+
+    func testCardioStillDeclinesWithGuidance() async {
+        // Cardio doesn't fit the set/rep schema — keep the guided card rather
+        // than fabricate a weights draft.
+        model.inputText = "5k 25min"
+        await model.parse()
+        XCTAssertNil(model.pending)
+        XCTAssertEqual(model.status, .declined)
+        XCTAssertEqual(model.lastDeclineReason, .cardio)
+    }
 }

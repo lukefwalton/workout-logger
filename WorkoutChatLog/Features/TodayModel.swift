@@ -323,20 +323,20 @@ final class TodayModel: ObservableObject {
             }
 
         case .declined(let reason):
-            // Graceful fallback: the parser couldn't read a full set, but if the
-            // line clearly names a known exercise ("oh press", "leg press") we'd
-            // rather drop into a fillable draft than throw up a "couldn't read
-            // that" wall. The user fills in reps/weight on the confirm card.
-            //
-            // Only when the decline is *generic* (no specific diagnosis): a
-            // concrete reason — rep range, cardio, two exercises, incomplete
-            // weight — is a more useful signal than a blank name-only draft, so
-            // it's left to surface its own status card.
-            if reason == nil, let recovered = recoveredNameOnlyDraft(from: input) {
+            // Best-effort, never a dead-end: salvage an editable draft from the
+            // line whenever we honestly can — a recognized lift, a weight with no
+            // reps, an unknown name typed alongside a load, or the ambiguous
+            // triple form — and drop into the confirm card with the fields we
+            // *could* read. The user fixes the rest there (reps, exercise, swap
+            // sets⇄reps). Only the two reasons where a draft would lie keep their
+            // guided card: cardio (wrong schema) and multi-exercise (we'd silently
+            // lose a lift). This is the whole reason the on-device model exists —
+            // and when it isn't present, this deterministic recovery stands in.
+            if let recovered = recoveredDraft(from: input, reason: reason) {
                 let planned = applySelectedPlannedExerciseIfNeeded(to: recovered.sets)
                 pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: planned.sets)
                 pendingPlannedExerciseID = planned.loggedRowID
-                pendingParseSource = nil   // neither grammar nor FM produced this; it's a name recovery
+                pendingParseSource = nil   // neither grammar nor FM produced this; it's a recovery
                 refreshPendingExerciseResolution()
                 clearClarificationState()
                 lastDeclineReason = nil
@@ -353,32 +353,151 @@ final class TodayModel: ObservableObject {
         }
     }
 
-    /// When a parse declines, try to recover the leading text as a recognized
-    /// exercise so the user gets an editable draft (reps/weight unset) instead of
-    /// a hard decline. Confident recognition only: an exact/alias resolve, or a
-    /// high-confidence fuzzy match — anything weaker stays a decline so genuine
-    /// non-workout prose ("did a great workout") isn't turned into a phantom set.
-    private func recoveredNameOnlyDraft(from input: String) -> WorkoutDraft? {
-        let name = TodayInputTokenizer.leadingNamePrefix(input)
-        guard name.count >= 2 else { return nil }
-
-        let recognizedName: String?
-        if ((try? store.resolveExercise(name)) ?? nil) != nil {
-            recognizedName = name   // exact or alias hit; the store resolves it again on save
-        } else if let best = (try? store.suggestExercisesFuzzy(for: name, limit: 1))?.first,
-                  best.score >= WorkoutStore.semanticEscalationThreshold {
-            recognizedName = best.canonicalName
-        } else {
-            recognizedName = nil
+    /// Salvage an editable draft from a line the parser declined, so the user lands
+    /// on the confirm card (and fixes what's missing) instead of a dead-end. Returns
+    /// nil only when a draft would be dishonest — genuine non-workout prose, cardio
+    /// (the set/rep schema doesn't fit), a rep range (the user should pick a count),
+    /// or a multi-exercise line (we'd silently drop a lift).
+    ///
+    /// What it reads, best-effort:
+    ///   • the leading text as the exercise — recognized → its canonical, unknown →
+    ///     a brand-new custom lift (the confirm card still offers "Did you mean…"
+    ///     near-neighbors and a "New exercise" notice, so assignment never fails);
+    ///   • a confident trailing weight when present ("bench 135", "frobnicator 135");
+    ///   • set/rep counts for the ambiguous triple form ("8x3x4" → 8×3, one tap to
+    ///     swap), the natural extension of the sets-vs-reps ambiguity.
+    ///
+    /// Reps stay UNSET (0) whenever they weren't actually read, so Save stays
+    /// disabled until the user confirms a real count — recovery never fabricates
+    /// reps, RIR, or load.
+    private func recoveredDraft(from input: String, reason: ParseDeclineReason?) -> WorkoutDraft? {
+        switch reason {
+        case .cardio, .multiExercise, .repRange:
+            // A draft here would fabricate (cardio/rep range) or silently lose a
+            // lift (multi-exercise); the guided card is the more honest answer.
+            return nil
+        case .incompleteWeight, .ambiguousTripleX, .none:
+            break
         }
-        guard let exerciseName = recognizedName else { return nil }
 
+        let name = TodayInputTokenizer.leadingNamePrefix(input)
+
+        // Ambiguous triple form ("8x3x4"): best-effort A sets × B reps, weight left
+        // unspecified. The dropped third number and the sets/reps split are exactly
+        // what the confirm card's swap control and editable fields are for.
+        if reason == .ambiguousTripleX, let triple = Self.ambiguousTripleCounts(in: input) {
+            let exerciseName = recoveredExerciseName(from: name) ?? name
+            guard !exerciseName.isEmpty else { return nil }
+            let sets = (0..<triple.sets).map { _ in
+                SetDraft(exerciseName: exerciseName, weight: 0,
+                         unit: UnitPreferences.current(), loadKind: .unspecified,
+                         reps: triple.reps, rir: nil, setType: .working,
+                         notes: nil, sourceText: input)
+            }
+            return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: sets)
+        }
+
+        // A confident trailing weight is itself strong evidence of a logging
+        // attempt, so it recovers even when the exercise is a brand-new lift the
+        // library has never seen — that becomes a custom workout, not a wall.
+        let weight = Self.trailingConfidentWeight(in: input)
+
+        let exerciseName: String
+        if let recognized = recoveredExerciseName(from: name) {
+            exerciseName = recognized
+        } else if weight != nil, name.count >= 2 {
+            exerciseName = name        // unknown lift + a real weight → a new custom exercise
+        } else {
+            // No recognizable lift and no weight to anchor on → genuine prose like
+            // "did a great workout". Decline cleanly rather than invent a set.
+            return nil
+        }
+        guard !exerciseName.isEmpty else { return nil }
+
+        let load = weight ?? 0
         // reps = 0 is the "unset" sentinel: it fails `WorkoutValidator.repsRange`,
         // so `canSave` stays false until the user fills reps in on the card.
-        let set = SetDraft(exerciseName: exerciseName, weight: 0,
-                           unit: UnitPreferences.current(), loadKind: .unspecified,
+        let set = SetDraft(exerciseName: exerciseName, weight: load,
+                           unit: UnitPreferences.current(),
+                           loadKind: load > 0 ? .external : .unspecified,
                            reps: 0, rir: nil, setType: .working, notes: nil, sourceText: input)
         return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [set])
+    }
+
+    /// Resolve a leading name span to a confident exercise: an exact/alias hit
+    /// (returned verbatim so the store re-resolves it on save) or a high-confidence
+    /// fuzzy match (returned as the canonical). nil for anything weaker.
+    private func recoveredExerciseName(from name: String) -> String? {
+        guard name.count >= 2 else { return nil }
+        if ((try? store.resolveExercise(name)) ?? nil) != nil { return name }
+        if let best = (try? store.suggestExercisesFuzzy(for: name, limit: 1))?.first,
+           best.score >= WorkoutStore.semanticEscalationThreshold {
+            return best.canonicalName
+        }
+        return nil
+    }
+
+    /// The trailing token read as a *confident* weight — a number with an explicit
+    /// unit ("135lb", "60kg") or one large enough that it can't be a set count
+    /// (> `maxPlausibleSetCount`). Returns nil for a bare small number (which could
+    /// be reps) or trailing non-unit junk, so recovery never guesses reps as load.
+    private static func trailingConfidentWeight(in input: String) -> Double? {
+        let tokens = input.lowercased().split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        guard let last = tokens.last else { return nil }
+        let digits = String(last.prefix { $0.isNumber || $0 == "." })
+        guard !digits.isEmpty, let value = Double(digits), value > 0, value.isFinite else { return nil }
+        let suffix = String(last.dropFirst(digits.count))
+        let hasUnit = ["lb", "lbs", "kg", "kgs", "pound", "pounds", "kilo", "kilos"].contains(suffix)
+        guard suffix.isEmpty || hasUnit else { return nil }
+        return (hasUnit || value > Double(DeterministicParser.maxPlausibleSetCount)) ? value : nil
+    }
+
+    /// The leading two numbers of an ambiguous `A x B x C` triple, read as
+    /// (sets: A, reps: B). The third number is genuinely ambiguous (weight? sets?),
+    /// so it's left for the user to add. nil if the counts fall outside savable
+    /// ranges.
+    private static func ambiguousTripleCounts(in input: String) -> (sets: Int, reps: Int)? {
+        let pattern = #"(?<![0-9])(\d{1,2})\s*x\s*(\d{1,2})\s*x\s*\d{1,2}(?![0-9])"#
+        let lower = input.lowercased()
+        guard let range = lower.range(of: pattern, options: .regularExpression) else { return nil }
+        let nums = lower[range].split(separator: "x").compactMap { Int(String($0).trimmingCharacters(in: .whitespaces)) }
+        guard nums.count >= 2 else { return nil }
+        let sets = nums[0], reps = nums[1]
+        guard (1...99).contains(sets), WorkoutValidator.repsRange.contains(reps) else { return nil }
+        return (sets, reps)
+    }
+
+    /// Whether the pending entry's sets and reps can be reinterpreted as each
+    /// other. True when every set shares one rep count and *both* the current set
+    /// count and rep count are valid in the opposite role — so the swap can never
+    /// produce an unsavable draft — and they actually differ (a swap of N×N is a
+    /// no-op). The confirm card shows the swap control only when this holds.
+    var pendingCanSwapSetsReps: Bool {
+        guard pendingRepsAreUniform,
+              let reps = pending?.sets.first?.reps, reps > 0 else { return false }
+        let setCount = pendingSetCount
+        guard setCount != reps else { return false }
+        return WorkoutValidator.repsRange.contains(setCount) && (1...99).contains(reps)
+    }
+
+    /// Reinterpret which number is sets and which is reps — the headline
+    /// flexibility fix. "5x3" parses as a best guess (5 sets × 3 reps); one tap
+    /// here makes it 3 sets × 5 reps. Acts only on a uniform-rep draft
+    /// (`pendingCanSwapSetsReps`), preserving each set's weight/unit/load/RIR/
+    /// type/name. No-op otherwise.
+    func swapSetsAndReps() {
+        guard pendingCanSwapSetsReps,
+              var draft = pending,
+              let template = draft.sets.first else { return }
+        let newReps = draft.sets.count
+        let newSetCount = template.reps
+        draft.sets = (0..<newSetCount).map { _ in
+            SetDraft(exerciseName: template.exerciseName, weight: template.weight,
+                     unit: template.unit, loadKind: template.loadKind, reps: newReps,
+                     rir: template.rir, setType: template.setType,
+                     notes: template.notes, sourceText: template.sourceText)
+        }
+        pending = draft
     }
 
     private func clearClarificationState() {
