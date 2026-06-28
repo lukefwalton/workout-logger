@@ -400,20 +400,21 @@ final class TodayModel: ObservableObject {
         // A confident trailing weight is itself strong evidence of a logging
         // attempt, so it recovers even when the exercise is a brand-new lift the
         // library has never seen — that becomes a custom workout, not a wall.
-        let weight = Self.trailingConfidentWeight(in: input)
-        guard isRecoverableExercise(name, hasWeight: weight != nil) else {
+        let confident = Self.trailingConfidentWeight(in: input)
+        guard isRecoverableExercise(name, hasWeight: confident != nil) else {
             // No recognizable lift and no weight to anchor on → genuine prose like
             // "did a great workout". Decline cleanly rather than invent a set.
             return nil
         }
 
-        let load = weight ?? 0
+        let load = confident?.weight ?? 0
         // reps = 0 is the "unset" sentinel: it fails `WorkoutValidator.repsRange`,
         // so `canSave` stays false until the user fills reps in on the card. We draft
         // with the *typed* name and let `refreshPendingExerciseResolution` propose
-        // near-neighbors / a new-exercise notice — never a silent rename.
+        // near-neighbors / a new-exercise notice — never a silent rename. A stated
+        // unit ("135 lb") is honored; otherwise the user's default applies.
         let set = SetDraft(exerciseName: name, weight: load,
-                           unit: UnitPreferences.current(),
+                           unit: confident?.unit ?? UnitPreferences.current(),
                            loadKind: load > 0 ? .external : .unspecified,
                            reps: 0, rir: nil, setType: .working, notes: nil, sourceText: input)
         return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [set])
@@ -436,19 +437,38 @@ final class TodayModel: ObservableObject {
         return false
     }
 
-    /// The trailing token read as a *confident* weight — a number with an explicit
-    /// unit ("135lb", "60kg") or one large enough that it can't be a set count
+    /// The trailing weight read with *confidence*, plus its stated unit if any: a
+    /// number with an explicit unit — glued ("135lb", "60kg") or spaced ("135 lb",
+    /// "60 kg") — or a bare number too large to be a set count
     /// (> `maxPlausibleSetCount`). Returns nil for a bare small number (which could
     /// be reps) or trailing non-unit junk, so recovery never guesses reps as load.
-    private static func trailingConfidentWeight(in input: String) -> Double? {
+    private static func trailingConfidentWeight(in input: String) -> (weight: Double, unit: WeightUnit?)? {
         let tokens = input.lowercased().split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
         guard let last = tokens.last else { return nil }
+
+        // Spaced unit: "<number> lb" — the unit is the final token, the value before it.
+        if let unit = unitKeyword(last), tokens.count >= 2,
+           let value = Double(tokens[tokens.count - 2]), value > 0, value.isFinite {
+            return (value, unit)
+        }
+
+        // Glued unit ("135lb") or a bare number.
         let digits = String(last.prefix { $0.isNumber || $0 == "." })
         guard !digits.isEmpty, let value = Double(digits), value > 0, value.isFinite else { return nil }
         let suffix = String(last.dropFirst(digits.count))
-        let hasUnit = ["lb", "lbs", "kg", "kgs", "pound", "pounds", "kilo", "kilos"].contains(suffix)
-        guard suffix.isEmpty || hasUnit else { return nil }
-        return (hasUnit || value > Double(DeterministicParser.maxPlausibleSetCount)) ? value : nil
+        if suffix.isEmpty {
+            return value > Double(DeterministicParser.maxPlausibleSetCount) ? (value, nil) : nil
+        }
+        guard let unit = unitKeyword(suffix) else { return nil }   // trailing junk, not a weight
+        return (value, unit)
+    }
+
+    private static func unitKeyword(_ token: String) -> WeightUnit? {
+        switch token {
+        case "lb", "lbs", "pound", "pounds": return .lb
+        case "kg", "kgs", "kilo", "kilos": return .kg
+        default: return nil
+        }
     }
 
     /// The leading two numbers of an ambiguous `A x B x C` triple, read as
@@ -472,11 +492,25 @@ final class TodayModel: ObservableObject {
     /// produce an unsavable draft — and they actually differ (a swap of N×N is a
     /// no-op). The confirm card shows the swap control only when this holds.
     var pendingCanSwapSetsReps: Bool {
-        guard pendingRepsAreUniform,
+        guard pendingRepsAreUniform, pendingSetsAreHomogeneous,
               let reps = pending?.sets.first?.reps, reps > 0 else { return false }
         let setCount = pendingSetCount
         guard setCount != reps else { return false }
         return WorkoutValidator.repsRange.contains(setCount) && (1...99).contains(reps)
+    }
+
+    /// Whether the pending entry's sets are identical apart from their (uniform)
+    /// reps — same weight, unit, load, RIR, type, and notes. Swap rebuilds every
+    /// set from the first, so it's lossless only when there's nothing per-set to
+    /// lose. Every set mutator is entry-wide today, so this always holds for a
+    /// uniform draft; the guard keeps swap honest if per-set editing is ever added.
+    private var pendingSetsAreHomogeneous: Bool {
+        guard let sets = pending?.sets, let first = sets.first else { return false }
+        return sets.allSatisfy {
+            $0.weight == first.weight && $0.unit == first.unit
+                && $0.loadKind == first.loadKind && $0.rir == first.rir
+                && $0.setType == first.setType && $0.notes == first.notes
+        }
     }
 
     /// Reinterpret which number is sets and which is reps — the headline

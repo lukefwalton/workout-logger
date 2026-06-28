@@ -766,6 +766,27 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.pendingWeight, 135)
     }
 
+    func testSpacedUnitWeightRecoversWithStatedUnit() async {
+        // "bench 135 lb" — a spaced unit is just as common as "135lb"; recover the
+        // weight AND honor the typed unit.
+        model.inputText = "bench 135 lb"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.pendingUnit, .lb)
+        XCTAssertNil(model.pendingReps)
+    }
+
+    func testUnknownExerciseWithSpacedKgRecoversAsNewExercise() async {
+        model.inputText = "frobnicator 60 kg"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "frobnicator")
+        XCTAssertTrue(model.pendingCreatesNewExercise)
+        XCTAssertEqual(model.pendingWeight, 60)
+        XCTAssertEqual(model.pendingUnit, .kg)
+    }
+
     func testAmbiguousTripleRecoversSwappableDraft() async {
         // "8x3x4" is genuinely ambiguous; recover a best-effort 8 sets × 3 reps
         // the user can swap, instead of a "please rephrase" wall.
