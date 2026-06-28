@@ -787,6 +787,36 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.pendingUnit, .kg)
     }
 
+    func testGluedAtWeightRecoversTheLoad() async {
+        // "bench @135" — the glued "@" is a load introducer; recovery must keep 135,
+        // not drop to weight 0.
+        model.inputText = "bench @135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertNil(model.pendingReps)
+    }
+
+    func testMultiplicationSignParsesLikeX() async {
+        // "135×8" with the Unicode × the confirm card displays should parse exactly
+        // like "135x8", not fall through to recovery.
+        model.inputText = "bench 135×8"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 1)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.pending?.sets.first?.reps, 8)
+    }
+
+    func testMultiplicationSignTripleRecoversSwappableDraft() async {
+        model.inputText = "squat 8×3×4"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 8)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingCanSwapSetsReps)
+    }
+
     func testAmbiguousTripleRecoversSwappableDraft() async {
         // "8x3x4" is genuinely ambiguous; recover a best-effort 8 sets × 3 reps
         // the user can swap, instead of a "please rephrase" wall.

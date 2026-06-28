@@ -364,9 +364,11 @@ enum DeterministicParser {
 
     /// Splits on whitespace, but first spaces out the operators that get glued to
     /// numbers in real shorthand: `x`/`X` between/`@`/`,`. Everything is lowercased
-    /// (the exercise name resolves case-insensitively).
+    /// (the exercise name resolves case-insensitively). The Unicode multiplication
+    /// sign `×` — what the confirm card itself displays, so it's easy to paste back
+    /// in — is folded to `x` first so it's a first-class synonym everywhere.
     private static func tokenize(_ raw: String) -> [String] {
-        let chars = Array(raw.lowercased())
+        let chars = Array(raw.lowercased().replacingOccurrences(of: "×", with: "x"))
         var out = ""
         for (i, c) in chars.enumerated() {
             if c == "x" {
@@ -461,7 +463,9 @@ enum DeterministicParser {
     static func diagnoseDecline(_ entry: String) -> ParseDeclineReason? {
         let trimmed = entry.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        let lower = trimmed.lowercased()
+        // Fold `×` to `x` so the diagnosis regexes (e.g. the 5×5×5 triple) see the
+        // same shorthand the grammar does.
+        let lower = trimmed.lowercased().replacingOccurrences(of: "×", with: "x")
 
         // Cardio shorthand: distance (5k / 5km) or `min`/`mins`/`minutes` near a
         // number. The schema is set/rep based, so call it out instead of guessing

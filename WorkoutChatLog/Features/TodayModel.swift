@@ -370,7 +370,7 @@ final class TodayModel: ObservableObject {
     /// Reps stay UNSET (0) whenever they weren't actually read, so Save stays
     /// disabled until the user confirms a real count — recovery never fabricates
     /// reps, RIR, or load.
-    private func recoveredDraft(from input: String, reason: ParseDeclineReason?) -> WorkoutDraft? {
+    private func recoveredDraft(from rawInput: String, reason: ParseDeclineReason?) -> WorkoutDraft? {
         switch reason {
         case .cardio, .multiExercise, .repRange:
             // A draft here would fabricate (cardio/rep range) or silently lose a
@@ -380,6 +380,9 @@ final class TodayModel: ObservableObject {
             break
         }
 
+        // Fold `×` to `x` so the recovery heuristics read it like the grammar does;
+        // the raw text is kept for the set's provenance (`sourceText`).
+        let input = rawInput.replacingOccurrences(of: "×", with: "x")
         let name = TodayInputTokenizer.leadingNamePrefix(input)
 
         // Ambiguous triple form ("8x3x4"): best-effort A sets × B reps, weight left
@@ -392,7 +395,7 @@ final class TodayModel: ObservableObject {
                 SetDraft(exerciseName: name, weight: 0,
                          unit: UnitPreferences.current(), loadKind: .unspecified,
                          reps: triple.reps, rir: nil, setType: .working,
-                         notes: nil, sourceText: input)
+                         notes: nil, sourceText: rawInput)
             }
             return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: sets)
         }
@@ -416,7 +419,7 @@ final class TodayModel: ObservableObject {
         let set = SetDraft(exerciseName: name, weight: load,
                            unit: confident?.unit ?? UnitPreferences.current(),
                            loadKind: load > 0 ? .external : .unspecified,
-                           reps: 0, rir: nil, setType: .working, notes: nil, sourceText: input)
+                           reps: 0, rir: nil, setType: .working, notes: nil, sourceText: rawInput)
         return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [set])
     }
 
@@ -444,7 +447,17 @@ final class TodayModel: ObservableObject {
     /// be reps) or trailing non-unit junk, so recovery never guesses reps as load.
     private static func trailingConfidentWeight(in input: String) -> (weight: Double, unit: WeightUnit?)? {
         let tokens = input.lowercased().split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
-        guard let last = tokens.last else { return nil }
+        guard var last = tokens.last else { return nil }
+
+        // An explicit "@" load introducer marks the trailing number as a weight even
+        // when it's small: glued ("@135") or spaced ("@ 135", "bench @ 8").
+        var introducedByAt = false
+        if last.hasPrefix("@") {
+            last = String(last.dropFirst())
+            introducedByAt = true
+        } else if tokens.count >= 2, tokens[tokens.count - 2] == "@" {
+            introducedByAt = true
+        }
 
         // Spaced unit: "<number> lb" — the unit is the final token, the value before it.
         if let unit = unitKeyword(last), tokens.count >= 2,
@@ -457,7 +470,7 @@ final class TodayModel: ObservableObject {
         guard !digits.isEmpty, let value = Double(digits), value > 0, value.isFinite else { return nil }
         let suffix = String(last.dropFirst(digits.count))
         if suffix.isEmpty {
-            return value > Double(DeterministicParser.maxPlausibleSetCount) ? (value, nil) : nil
+            return (introducedByAt || value > Double(DeterministicParser.maxPlausibleSetCount)) ? (value, nil) : nil
         }
         guard let unit = unitKeyword(suffix) else { return nil }   // trailing junk, not a weight
         return (value, unit)

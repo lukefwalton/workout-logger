@@ -45,6 +45,8 @@ let parserFixtures: [ParserFixture] = [
     ParserFixture(input: "deadlift 405x3", exercise: "deadlift", expected: [s(405, 3)]),
     ParserFixture(input: "curl 30x15", exercise: "curl", expected: [s(30, 15)]),
     ParserFixture(input: "squat 315X5", exercise: "squat", expected: [s(315, 5)]),
+    // Unicode × (what the confirm card displays) is a first-class synonym for x.
+    ParserFixture(input: "bench 135×8", exercise: "bench", expected: [s(135, 8)]),
     ParserFixture(input: "bench 137.5 x 5", exercise: "bench", expected: [s(137.5, 5)]),
     ParserFixture(input: "ohp 42.5x8", exercise: "ohp", expected: [s(42.5, 8)]),
 
