@@ -692,4 +692,202 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.status, .declined)
         XCTAssertNil(model.lastDeclineReason)
     }
+
+    // MARK: - Sets⇄reps swap + best-effort recovery
+
+    func testSwapSetsAndRepsReinterpretsAmbiguousScheme() async {
+        // "5x3" parses as a best guess of 5 sets × 3 reps; one tap flips it.
+        model.inputText = "5x3"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 5)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingCanSwapSetsReps)
+
+        model.swapSetsAndReps()
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 5)
+    }
+
+    func testSwapPreservesWeightAndName() async {
+        model.inputText = "squat 3x10 @ 135"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 10)
+
+        model.swapSetsAndReps()
+        XCTAssertEqual(model.pendingSetCount, 10)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertEqual(model.pending?.sets.allSatisfy { $0.weight == 135 }, true)
+        XCTAssertEqual(model.pendingExerciseName, "squat")
+    }
+
+    func testSwapIsHiddenForUnevenReps() async {
+        model.inputText = "bench 135 for 8,8,7"
+        await model.parse()
+        XCTAssertFalse(model.pendingCanSwapSetsReps, "uneven reps have no single value to swap")
+    }
+
+    func testSwapIsHiddenWhenSetsEqualReps() async {
+        model.inputText = "pullup 5x5"
+        await model.parse()
+        XCTAssertEqual(model.pendingSetCount, 5)
+        XCTAssertEqual(model.pendingReps, 5)
+        XCTAssertFalse(model.pendingCanSwapSetsReps, "swapping 5×5 would be a no-op")
+    }
+
+    func testIncompleteWeightRecoversEditableDraft() async throws {
+        // "bench 135" — a weight with no reps used to dead-end. Now it recovers
+        // into a fillable draft: add reps and save.
+        model.inputText = "bench 135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertNil(model.lastDeclineReason)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertNil(model.pendingReps, "reps stay unset — recovery never fabricates them")
+        XCTAssertFalse(model.canSave)
+
+        model.setReps(8)
+        XCTAssertTrue(model.canSave)
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        let stored = try XCTUnwrap(try store.sets(inSession: 1).first)
+        XCTAssertEqual(stored.weight, 135)
+        XCTAssertEqual(stored.reps, 8)
+    }
+
+    func testUnknownExerciseWithWeightRecoversAsNewCustomExercise() async {
+        // An unfamiliar lift typed with a real load becomes a custom exercise,
+        // never a "we don't know that one" wall.
+        model.inputText = "frobnicator 135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "frobnicator")
+        XCTAssertTrue(model.pendingCreatesNewExercise, "an unknown lift recovers as a new custom exercise")
+        XCTAssertEqual(model.pendingWeight, 135)
+    }
+
+    func testSpacedUnitWeightRecoversWithStatedUnit() async {
+        // "bench 135 lb" — a spaced unit is just as common as "135lb"; recover the
+        // weight AND honor the typed unit.
+        model.inputText = "bench 135 lb"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.pendingUnit, .lb)
+        XCTAssertNil(model.pendingReps)
+    }
+
+    func testUnknownExerciseWithSpacedKgRecoversAsNewExercise() async {
+        model.inputText = "frobnicator 60 kg"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "frobnicator")
+        XCTAssertTrue(model.pendingCreatesNewExercise)
+        XCTAssertEqual(model.pendingWeight, 60)
+        XCTAssertEqual(model.pendingUnit, .kg)
+    }
+
+    func testGluedAtWeightRecoversTheLoad() async {
+        // "bench @135" — the glued "@" is a load introducer; recovery must keep 135,
+        // not drop to weight 0.
+        model.inputText = "bench @135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertNil(model.pendingReps)
+    }
+
+    func testTrailingPunctuationStillExposesTheLoad() async {
+        // Chat-style trailing punctuation must not swallow the load.
+        model.inputText = "bench 135,"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+
+        model.discard()
+        model.inputText = "frobnicator 60kg?"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "frobnicator")
+        XCTAssertTrue(model.pendingCreatesNewExercise)
+        XCTAssertEqual(model.pendingWeight, 60)
+        XCTAssertEqual(model.pendingUnit, .kg)
+    }
+
+    func testMultiplicationSignParsesLikeX() async {
+        // "135×8" with the Unicode × the confirm card displays should parse exactly
+        // like "135x8", not fall through to recovery.
+        model.inputText = "bench 135×8"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 1)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.pending?.sets.first?.reps, 8)
+    }
+
+    func testMultiplicationSignTripleRecoversSwappableDraft() async {
+        model.inputText = "squat 8×3×4"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 8)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingCanSwapSetsReps)
+    }
+
+    func testAmbiguousTripleRecoversSwappableDraft() async {
+        // "8x3x4" is genuinely ambiguous; recover a best-effort 8 sets × 3 reps
+        // the user can swap, instead of a "please rephrase" wall.
+        model.inputText = "squat 8x3x4"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 8)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingCanSwapSetsReps)
+
+        model.swapSetsAndReps()
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 8)
+    }
+
+    func testPureSchemeRecoversWithoutInventingAName() async {
+        // "8x3x4" names no lift; recovery must leave the exercise blank for the user
+        // to name — never fabricate one. (The FM prompt is held to the same rule;
+        // that path is exercised on-device.)
+        model.inputText = "8x3x4"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 8)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingExerciseName.isEmpty, "a pure scheme stays nameless until the user names it")
+        XCTAssertFalse(model.canSave, "no exercise yet, so Save stays disabled")
+    }
+
+    func testAliasKnownLiftWithWeightResolvesToExistingExercise() async throws {
+        // "ohp 135" — a known alias + a load. Recovery keeps the typed name, and the
+        // store resolves it to the existing Overhead Press on save, not a new custom
+        // lift. This pins the "save still resolves against the library" contract.
+        let existingID = try XCTUnwrap(try store.resolveExercise("ohp"), "ohp is a seeded alias")
+        model.inputText = "ohp 135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertFalse(model.pendingCreatesNewExercise, "a known alias resolves to the existing lift, not a new one")
+
+        model.setReps(8)
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        let afterID = try XCTUnwrap(try store.resolveExercise("ohp"))
+        XCTAssertEqual(afterID, existingID,
+                       "save resolved the alias to the same existing lift, creating no new custom row")
+    }
+
+    func testCardioStillDeclinesWithGuidance() async {
+        // Cardio doesn't fit the set/rep schema — keep the guided card rather
+        // than fabricate a weights draft.
+        model.inputText = "5k 25min"
+        await model.parse()
+        XCTAssertNil(model.pending)
+        XCTAssertEqual(model.status, .declined)
+        XCTAssertEqual(model.lastDeclineReason, .cardio)
+    }
 }

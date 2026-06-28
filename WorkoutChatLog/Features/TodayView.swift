@@ -627,6 +627,22 @@ struct TodayView: View {
                         .accessibilityLabel("Add a set")
                     }
 
+                    // Sets⇄reps swap: the parser makes its best guess for an
+                    // ambiguous scheme ("5x3" → 5 sets × 3 reps); one tap flips
+                    // which number is which. Shown only when the flip stays
+                    // savable (`pendingCanSwapSetsReps`).
+                    if model.pendingCanSwapSetsReps {
+                        Button(action: model.swapSetsAndReps) {
+                            Label("Swap to \(model.pendingReps ?? 0) sets × \(model.pendingSetCount) reps",
+                                  systemImage: "arrow.triangle.2.circlepath")
+                                .font(.caption).fontWeight(.semibold)
+                                .foregroundStyle(Theme.ocean)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityHint("Reinterpret which number is sets and which is reps")
+                    }
+
                     ForEach(Array(pending.sets.enumerated()), id: \.offset) { index, set in
                         HStack {
                             Text("Set \(index + 1)")
