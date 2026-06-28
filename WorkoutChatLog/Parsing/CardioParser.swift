@@ -26,8 +26,14 @@ enum CardioParser {
         guard !original.isEmpty else { return nil }
         let lower = original.lowercased().replacingOccurrences(of: "×", with: "x")
 
-        let duration = parseDuration(lower)
-        let distance = parseDistance(lower)
+        // Count-based shapes ("10k steps", "20 laps") name a metric the schema
+        // can't store (steps / laps, not minutes or km). Recognize the activity,
+        // but never fabricate a distance/duration from the count — "10k steps" is
+        // not 10 km, and "20 laps" is not 20 minutes. The raw text stays in
+        // sourceText for the user to refine on the confirm card.
+        let isCountBased = ["steps", "step", "laps", "lap"].contains { containsWholeWords(lower, $0) }
+        let duration = isCountBased ? nil : parseDuration(lower)
+        let distance = isCountBased ? nil : parseDistance(lower)
         let match = matchActivity(in: lower)
         let hasMetric = duration != nil || distance != nil
 
@@ -47,9 +53,10 @@ enum CardioParser {
                   !hasForeignWords(lower, matched: strong) else { return nil }
         }
 
-        // Best-effort: a lone "<activity> 30" with no unit is minutes.
+        // Best-effort: a lone "<activity> 30" with no unit is minutes — but never
+        // for a count-based line, where the number is steps/laps, not minutes.
         var resolvedDuration = duration
-        if resolvedDuration == nil, distance == nil, match != nil,
+        if resolvedDuration == nil, distance == nil, !isCountBased, match != nil,
            let bare = firstBareNumber(in: lower), bare >= 1, bare <= Double(maxInferredMinutes),
            bare.rounded() == bare {
             resolvedDuration = Int(bare) * 60

@@ -122,6 +122,24 @@ final class CardioParserTests: XCTestCase {
         XCTAssertEqual(ruck.distanceUnit, .km)
     }
 
+    func testCountBasedInputsLogActivityWithoutFabricatingMetrics() throws {
+        // "10k steps" is not 10 km; "20 laps" is not 20 minutes. Recognize the
+        // activity but store no fabricated distance/duration.
+        let steps = try XCTUnwrap(parse("10k steps"))
+        XCTAssertEqual(steps.activity, "Walk")
+        XCTAssertNil(steps.distance)
+        XCTAssertNil(steps.durationSeconds)
+
+        let bigSteps = try XCTUnwrap(parse("5000 steps"))
+        XCTAssertEqual(bigSteps.activity, "Walk")
+        XCTAssertNil(bigSteps.durationSeconds)
+
+        let laps = try XCTUnwrap(parse("20 laps"))
+        XCTAssertEqual(laps.activity, "Swimming")
+        XCTAssertNil(laps.distance)
+        XCTAssertNil(laps.durationSeconds)
+    }
+
     func testSeconds() throws {
         // The file's own contract lists "45s"; bare-s must read as seconds, not
         // fall through to minute inference.

@@ -909,6 +909,17 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.pendingCardioMinutes, 30)
     }
 
+    func testSubMinuteCardioDurationIsPreservedNotRounded() async throws {
+        model.inputText = "run 45s"
+        await model.parse()
+        let cardio = try XCTUnwrap(model.pendingCardio)
+        XCTAssertEqual(cardio.durationSeconds, 45)
+        XCTAssertNil(model.pendingCardioMinutes, "45s isn't shown as a rounded 1 min")
+        model.saveCardio()
+        let stored = try XCTUnwrap(try store.cardioEntries().first)
+        XCTAssertEqual(stored.durationSeconds, 45, "the exact seconds are saved, not rounded up")
+    }
+
     func testBodyweightSchemeDefaultsToBodyweight() async {
         // "chin up 3x10" parses strictly; the model defaults the load-less,
         // unspecified sets to bodyweight instead of "unspecified × —".

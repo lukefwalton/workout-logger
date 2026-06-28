@@ -813,10 +813,14 @@ final class TodayModel: ObservableObject {
         pendingCardio = cardio
     }
 
-    /// Duration as whole minutes for the confirm card's editor; nil when unset.
+    /// Duration as whole minutes for the confirm card's editor; nil when unset or
+    /// when the bout isn't a whole number of minutes. Sub-minute durations
+    /// ("run 45s") aren't shown as a rounded "1" — that would both misrepresent
+    /// the value and, on edit, silently rewrite 45s to 60s. The exact
+    /// `durationSeconds` is preserved on save unless the user types a minutes value.
     var pendingCardioMinutes: Int? {
-        guard let seconds = pendingCardio?.durationSeconds, seconds > 0 else { return nil }
-        return Int((Double(seconds) / 60).rounded())
+        guard let seconds = pendingCardio?.durationSeconds, seconds > 0, seconds % 60 == 0 else { return nil }
+        return seconds / 60
     }
 
     func setCardioMinutes(_ minutes: Int?) {
