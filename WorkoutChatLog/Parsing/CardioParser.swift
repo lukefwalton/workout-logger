@@ -27,13 +27,14 @@ enum CardioParser {
         let lower = original.lowercased().replacingOccurrences(of: "×", with: "x")
 
         // Count-based shapes ("10k steps", "20 laps") name a metric the schema
-        // can't store (steps / laps, not minutes or km). Recognize the activity,
-        // but never fabricate a distance/duration from the count — "10k steps" is
-        // not 10 km, and "20 laps" is not 20 minutes. The raw text stays in
-        // sourceText for the user to refine on the confirm card.
-        let isCountBased = ["steps", "step", "laps", "lap"].contains { containsWholeWords(lower, $0) }
-        let duration = isCountBased ? nil : parseDuration(lower)
-        let distance = isCountBased ? nil : parseDistance(lower)
+        // can't store (steps / laps, not minutes or km). Strip just the count
+        // token before reading duration/distance, so a metric on the SAME line
+        // still round-trips honestly ("swim 1000m 20 laps" keeps 1000 m; "walk
+        // 30 min 5000 steps" keeps 30 min) while the count itself never becomes a
+        // fabricated distance/duration ("10k steps" is not 10 km).
+        let metricText = strippedOfCounts(lower)
+        let duration = parseDuration(metricText)
+        let distance = parseDistance(metricText)
         let match = matchActivity(in: lower)
         let hasMetric = duration != nil || distance != nil
 
@@ -53,11 +54,12 @@ enum CardioParser {
                   !hasForeignWords(lower, matched: strong) else { return nil }
         }
 
-        // Best-effort: a lone "<activity> 30" with no unit is minutes — but never
-        // for a count-based line, where the number is steps/laps, not minutes.
+        // Best-effort: a lone "<activity> 30" with no unit is minutes. Read it
+        // from `metricText`, so a stripped count ("10k steps") can't be mistaken
+        // for an inferred duration.
         var resolvedDuration = duration
-        if resolvedDuration == nil, distance == nil, !isCountBased, match != nil,
-           let bare = firstBareNumber(in: lower), bare >= 1, bare <= Double(maxInferredMinutes),
+        if resolvedDuration == nil, distance == nil, match != nil,
+           let bare = firstBareNumber(in: metricText), bare >= 1, bare <= Double(maxInferredMinutes),
            bare.rounded() == bare {
             resolvedDuration = Int(bare) * 60
         }
@@ -188,6 +190,14 @@ enum CardioParser {
 
     private static func firstBareNumber(in lower: String) -> Double? {
         firstNumber(#"(?<![0-9.])([0-9]+(?:\.[0-9]+)?)(?![0-9.])"#, in: lower)
+    }
+
+    /// Remove count tokens ("10k steps", "5000 steps", "20 laps") so the rest of
+    /// the line can be read for a storable duration/distance. Only the count
+    /// phrase is dropped — any other metric on the line survives.
+    private static func strippedOfCounts(_ lower: String) -> String {
+        lower.replacingOccurrences(of: #"\b\d+(?:\.\d+)?k?\s*(?:steps?|laps?)\b"#,
+                                   with: " ", options: .regularExpression)
     }
 
     private static func isUnitWord(_ token: String) -> Bool {

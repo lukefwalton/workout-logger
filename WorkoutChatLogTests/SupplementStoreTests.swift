@@ -24,7 +24,7 @@ final class SupplementStoreTests: XCTestCase {
     }
 
     func testFreshStoreIsV2WithSeededPresets() throws {
-        XCTAssertEqual(try store.schemaVersion(), 2)
+        XCTAssertEqual(try store.schemaVersion(), Schema.latestVersion)   // v3 added cardio_entries
         let supplements = try store.supplements()
         XCTAssertEqual(supplements.map(\.name), ["Creatine", "Protein"])
         XCTAssertTrue(supplements.allSatisfy(\.isPreset))
@@ -47,7 +47,7 @@ final class SupplementStoreTests: XCTestCase {
         try db.setUserVersion(1)
 
         try Schema.migrate(db)
-        XCTAssertEqual(try db.userVersion(), 2, "forward-migrates v1 → v2")
+        XCTAssertEqual(try db.userVersion(), Schema.latestVersion, "forward-migrates v1 → latest (v2 supplements + v3 cardio)")
 
         let migrated = WorkoutStore(db: db)
         try migrated.seedSupplementsIfNeeded()

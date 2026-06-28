@@ -140,6 +140,19 @@ final class CardioParserTests: XCTestCase {
         XCTAssertNil(laps.durationSeconds)
     }
 
+    func testCountAlongsideARealMetricKeepsTheMetric() throws {
+        // Only the count token is dropped — a storable metric on the same line
+        // survives.
+        let swim = try XCTUnwrap(parse("swim 1000m 20 laps"))
+        XCTAssertEqual(swim.activity, "Swimming")
+        XCTAssertEqual(swim.distance, 1000)
+        XCTAssertEqual(swim.distanceUnit, .m)
+
+        let walk = try XCTUnwrap(parse("walk 30 min 5000 steps"))
+        XCTAssertEqual(walk.activity, "Walk")
+        XCTAssertEqual(walk.durationSeconds, 1800)
+    }
+
     func testSeconds() throws {
         // The file's own contract lists "45s"; bare-s must read as seconds, not
         // fall through to minute inference.

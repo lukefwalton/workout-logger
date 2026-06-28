@@ -420,12 +420,14 @@ final class TodayModel: ObservableObject {
         let hasStructure = sets.count > 1 || hasExplicitReps
 
         // Gate: only recover when there's a real logging signal — a recognizable
-        // lift, a weight to anchor on, or an explicit set/rep structure — so genuine
-        // prose ("did a great workout") declines cleanly instead of becoming a
-        // phantom set. We draft with the *typed* name and let
+        // lift, a weight to anchor on, or an explicit set/rep structure. Genuine
+        // prose ("did a great workout") has none of these and declines cleanly
+        // instead of becoming a phantom set. An explicit structure recovers even
+        // with no name — a pure scheme like "8x3x4" lands as a nameless draft the
+        // user names, exactly like "3x10". We draft with the *typed* name and let
         // `refreshPendingExerciseResolution` propose near-neighbors / a new-exercise
         // notice — never a silent rename.
-        guard isRecoverableExercise(name, hasWeight: hasWeight) || (hasStructure && !name.isEmpty) else {
+        guard isRecoverableExercise(name, hasWeight: hasWeight) || hasStructure else {
             return nil
         }
         return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: sets)
