@@ -31,6 +31,7 @@ final class TodayModel: ObservableObject {
         case declined           // neither the grammar nor the LLM could read it
         case needsClarification(ClarificationPrompt)   // FM asked one short question (PR 8)
         case saved(Int)         // n sets written
+        case savedCardio(String) // a cardio bout written (summary line)
         case failed(String)
     }
 
@@ -69,6 +70,11 @@ final class TodayModel: ObservableObject {
     @Published private(set) var plannedExercises: [PlannedExercise] = []
     @Published private(set) var selectedPlannedExerciseID: UUID?
     @Published private(set) var pending: WorkoutDraft?
+    /// A pending cardio bout awaiting confirmation. Mutually exclusive with
+    /// `pending` (a line is either strength or cardio), so the confirm UI shows
+    /// at most one card. Cardio is stored on its own write path (`saveCardio`),
+    /// independent of the strength session.
+    @Published private(set) var pendingCardio: CardioDraft?
     @Published private(set) var pendingCreatesNewExercise = false
     /// Layer-2 fuzzy candidates shown above the new-exercise notice when a save
     /// would create a new lift — "Did you mean …?". Tapping one renames; nothing
@@ -258,6 +264,7 @@ final class TodayModel: ObservableObject {
         invalidateInFlightParse()
         clearClarificationState()
         pending = nil
+        pendingCardio = nil
         clearPendingResolutionHints()
         pendingParseSource = nil
         status = .idle
@@ -294,10 +301,13 @@ final class TodayModel: ObservableObject {
     }
 
     private func apply(_ outcome: ParseOutcome, input: String) {
+        // A fresh outcome supersedes any pending cardio bout; the cardio branch
+        // below re-sets it when this line is cardio.
+        pendingCardio = nil
         switch outcome {
         case .draft(let result):
             let planned = applySelectedPlannedExerciseIfNeeded(to: result.sets)
-            pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: planned.sets)
+            pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: applyBodyweightDefault(to: planned.sets))
             pendingPlannedExerciseID = planned.loggedRowID
             pendingParseSource = result.source
             refreshPendingExerciseResolution()
@@ -323,18 +333,32 @@ final class TodayModel: ObservableObject {
             }
 
         case .declined(let reason):
+            // Cardio first: the set/rep schema can't hold duration/distance, so a
+            // line with a cardio signal ("bike 30 min", "ran 5k") becomes a cardio
+            // bout the user confirms — never a guessed weight/reps, never a dead-end.
+            if let cardio = CardioParser.parse(input) {
+                pendingCardio = cardio
+                pending = nil
+                clearPendingResolutionHints()
+                pendingParseSource = nil
+                pendingPlannedExerciseID = nil
+                clearClarificationState()
+                lastDeclineReason = nil
+                status = .idle
+                return
+            }
             // Best-effort, never a dead-end: salvage an editable draft from the
-            // line whenever we honestly can — a recognized lift, a weight with no
-            // reps, an unknown name typed alongside a load, or the ambiguous
-            // triple form — and drop into the confirm card with the fields we
-            // *could* read. The user fixes the rest there (reps, exercise, swap
-            // sets⇄reps). Only the two reasons where a draft would lie keep their
-            // guided card: cardio (wrong schema) and multi-exercise (we'd silently
-            // lose a lift). This is the whole reason the on-device model exists —
-            // and when it isn't present, this deterministic recovery stands in.
+            // line whenever we honestly can — a recognized lift, a weight in any
+            // word order, set/rep counts however phrased — and drop into the
+            // confirm card with the fields we *could* read. The user fixes the
+            // rest there (reps, exercise, swap sets⇄reps). Only the reasons where
+            // a draft would lie keep their guided card: a rep range (pick a count)
+            // and multi-exercise (we'd silently lose a lift). This is the whole
+            // reason the on-device model exists — and when it isn't present, this
+            // forgiving recovery stands in.
             if let recovered = recoveredDraft(from: input, reason: reason) {
                 let planned = applySelectedPlannedExerciseIfNeeded(to: recovered.sets)
-                pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: planned.sets)
+                pending = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: applyBodyweightDefault(to: planned.sets))
                 pendingPlannedExerciseID = planned.loggedRowID
                 pendingParseSource = nil   // neither grammar nor FM produced this; it's a recovery
                 refreshPendingExerciseResolution()
@@ -372,58 +396,39 @@ final class TodayModel: ObservableObject {
     /// reps, RIR, or load.
     private func recoveredDraft(from rawInput: String, reason: ParseDeclineReason?) -> WorkoutDraft? {
         switch reason {
-        case .cardio, .multiExercise, .repRange:
-            // A draft here would fabricate (cardio/rep range) or silently lose a
-            // lift (multi-exercise); the guided card is the more honest answer.
+        case .multiExercise, .repRange:
+            // A draft here would silently lose a lift (multi-exercise) or have to
+            // pick a rep endpoint the user didn't state (rep range); the guided
+            // card is the more honest answer. (Cardio is handled before this is
+            // ever called.)
             return nil
-        case .incompleteWeight, .ambiguousTripleX, .none:
+        case .cardio, .incompleteWeight, .ambiguousTripleX, .none:
             break
         }
 
-        // Fold `×` to `x` so the recovery heuristics read it like the grammar does,
-        // and strip trailing chat punctuation so "bench 135," / "60kg?" still expose
-        // their load. The raw text is kept for the set's provenance (`sourceText`).
-        let input = rawInput
-            .replacingOccurrences(of: "×", with: "x")
-            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n,.;:?!"))
-        let name = TodayInputTokenizer.leadingNamePrefix(input)
+        // The forgiving extractor reads weight/unit/sets/reps/name in any order,
+        // tolerates filler, defaults bodyweight lifts to BW, and cleans punctuation
+        // off the name ("chinups," → "chinups"). Reps it didn't read stay 0, the
+        // unset sentinel, so Save stays disabled until the user confirms a count —
+        // recovery never fabricates reps, RIR, or load.
+        guard let sets = ForgivingParser.parse(rawInput, defaultUnit: UnitPreferences.current()),
+              !sets.isEmpty else { return nil }
 
-        // Ambiguous triple form ("8x3x4"): best-effort A sets × B reps, weight left
-        // unspecified. The explicit AxBxC structure is itself proof of a logging
-        // attempt, so it recovers on its own — an empty name just becomes a bare
-        // scheme the user names, exactly like "3x10". The dropped third number and
-        // the sets/reps split are what the swap control and editable fields fix.
-        if reason == .ambiguousTripleX, let triple = Self.ambiguousTripleCounts(in: input) {
-            let sets = (0..<triple.sets).map { _ in
-                SetDraft(exerciseName: name, weight: 0,
-                         unit: UnitPreferences.current(), loadKind: .unspecified,
-                         reps: triple.reps, rir: nil, setType: .working,
-                         notes: nil, sourceText: rawInput)
-            }
-            return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: sets)
-        }
+        let name = sets.first?.exerciseName ?? ""
+        let hasWeight = (sets.first?.weight ?? 0) > 0
+        let hasExplicitReps = sets.contains { WorkoutValidator.repsRange.contains($0.reps) }
+        let hasStructure = sets.count > 1 || hasExplicitReps
 
-        // A confident trailing weight is itself strong evidence of a logging
-        // attempt, so it recovers even when the exercise is a brand-new lift the
-        // library has never seen — that becomes a custom workout, not a wall.
-        let confident = Self.trailingConfidentWeight(in: input)
-        guard isRecoverableExercise(name, hasWeight: confident != nil) else {
-            // No recognizable lift and no weight to anchor on → genuine prose like
-            // "did a great workout". Decline cleanly rather than invent a set.
+        // Gate: only recover when there's a real logging signal — a recognizable
+        // lift, a weight to anchor on, or an explicit set/rep structure — so genuine
+        // prose ("did a great workout") declines cleanly instead of becoming a
+        // phantom set. We draft with the *typed* name and let
+        // `refreshPendingExerciseResolution` propose near-neighbors / a new-exercise
+        // notice — never a silent rename.
+        guard isRecoverableExercise(name, hasWeight: hasWeight) || (hasStructure && !name.isEmpty) else {
             return nil
         }
-
-        let load = confident?.weight ?? 0
-        // reps = 0 is the "unset" sentinel: it fails `WorkoutValidator.repsRange`,
-        // so `canSave` stays false until the user fills reps in on the card. We draft
-        // with the *typed* name and let `refreshPendingExerciseResolution` propose
-        // near-neighbors / a new-exercise notice — never a silent rename. A stated
-        // unit ("135 lb") is honored; otherwise the user's default applies.
-        let set = SetDraft(exerciseName: name, weight: load,
-                           unit: confident?.unit ?? UnitPreferences.current(),
-                           loadKind: load > 0 ? .external : .unspecified,
-                           reps: 0, rir: nil, setType: .working, notes: nil, sourceText: rawInput)
-        return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [set])
+        return WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: sets)
     }
 
     /// Whether a declined line's leading text is a plausible exercise worth
@@ -441,65 +446,6 @@ final class TodayModel: ObservableObject {
             return true
         }
         return false
-    }
-
-    /// The trailing weight read with *confidence*, plus its stated unit if any: a
-    /// number with an explicit unit — glued ("135lb", "60kg") or spaced ("135 lb",
-    /// "60 kg") — or a bare number too large to be a set count
-    /// (> `maxPlausibleSetCount`). Returns nil for a bare small number (which could
-    /// be reps) or trailing non-unit junk, so recovery never guesses reps as load.
-    private static func trailingConfidentWeight(in input: String) -> (weight: Double, unit: WeightUnit?)? {
-        let tokens = input.lowercased().split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
-        guard var last = tokens.last else { return nil }
-
-        // An explicit "@" load introducer marks the trailing number as a weight even
-        // when it's small: glued ("@135") or spaced ("@ 135", "bench @ 8").
-        var introducedByAt = false
-        if last.hasPrefix("@") {
-            last = String(last.dropFirst())
-            introducedByAt = true
-        } else if tokens.count >= 2, tokens[tokens.count - 2] == "@" {
-            introducedByAt = true
-        }
-
-        // Spaced unit: "<number> lb" — the unit is the final token, the value before it.
-        if let unit = unitKeyword(last), tokens.count >= 2,
-           let value = Double(tokens[tokens.count - 2]), value > 0, value.isFinite {
-            return (value, unit)
-        }
-
-        // Glued unit ("135lb") or a bare number.
-        let digits = String(last.prefix { $0.isNumber || $0 == "." })
-        guard !digits.isEmpty, let value = Double(digits), value > 0, value.isFinite else { return nil }
-        let suffix = String(last.dropFirst(digits.count))
-        if suffix.isEmpty {
-            return (introducedByAt || value > Double(DeterministicParser.maxPlausibleSetCount)) ? (value, nil) : nil
-        }
-        guard let unit = unitKeyword(suffix) else { return nil }   // trailing junk, not a weight
-        return (value, unit)
-    }
-
-    private static func unitKeyword(_ token: String) -> WeightUnit? {
-        switch token {
-        case "lb", "lbs", "pound", "pounds": return .lb
-        case "kg", "kgs", "kilo", "kilos": return .kg
-        default: return nil
-        }
-    }
-
-    /// The leading two numbers of an ambiguous `A x B x C` triple, read as
-    /// (sets: A, reps: B). The third number is genuinely ambiguous (weight? sets?),
-    /// so it's left for the user to add. nil if the counts fall outside savable
-    /// ranges.
-    private static func ambiguousTripleCounts(in input: String) -> (sets: Int, reps: Int)? {
-        let pattern = #"(?<![0-9])(\d{1,2})\s*x\s*(\d{1,2})\s*x\s*\d{1,2}(?![0-9])"#
-        let lower = input.lowercased()
-        guard let range = lower.range(of: pattern, options: .regularExpression) else { return nil }
-        let nums = lower[range].split(separator: "x").compactMap { Int(String($0).trimmingCharacters(in: .whitespaces)) }
-        guard nums.count >= 2 else { return nil }
-        let sets = nums[0], reps = nums[1]
-        guard (1...99).contains(sets), WorkoutValidator.repsRange.contains(reps) else { return nil }
-        return (sets, reps)
     }
 
     /// Whether the pending entry's sets and reps can be reinterpreted as each
@@ -826,6 +772,7 @@ final class TodayModel: ObservableObject {
     func discard() {
         invalidateInFlightParse()
         pending = nil
+        pendingCardio = nil
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
@@ -837,6 +784,103 @@ final class TodayModel: ObservableObject {
 
     func setMode(_ mode: Mode) {
         self.mode = mode
+        status = .idle
+    }
+
+    // MARK: - Cardio confirm + save
+
+    /// Default a load-less, unspecified set to bodyweight when the exercise is a
+    /// movement that's almost always bodyweight (chin-up, push-up, dip, …). Keeps
+    /// `.external` (a weighted variant) and already-confirmed loads untouched. The
+    /// honest fix for "chin up 3x10" reading as "unspecified × —" instead of "BW".
+    private func applyBodyweightDefault(to sets: [SetDraft]) -> [SetDraft] {
+        guard let name = sets.first?.exerciseName,
+              ForgivingParser.likelyBodyweightExercise(name) else { return sets }
+        return sets.map { set in
+            guard set.loadKind == .unspecified, set.weight == 0 else { return set }
+            var copy = set
+            copy.loadKind = .bodyweight
+            return copy
+        }
+    }
+
+    /// The pending cardio bout's activity name (empty when there's no bout).
+    var pendingCardioActivity: String { pendingCardio?.activity ?? "" }
+
+    func setCardioActivity(_ name: String) {
+        guard var cardio = pendingCardio else { return }
+        cardio.activity = name
+        pendingCardio = cardio
+    }
+
+    /// Duration as whole minutes for the confirm card's editor; nil when unset.
+    var pendingCardioMinutes: Int? {
+        guard let seconds = pendingCardio?.durationSeconds, seconds > 0 else { return nil }
+        return Int((Double(seconds) / 60).rounded())
+    }
+
+    func setCardioMinutes(_ minutes: Int?) {
+        guard var cardio = pendingCardio else { return }
+        if let minutes, minutes > 0 {
+            cardio.durationSeconds = minutes * 60
+        } else {
+            cardio.durationSeconds = nil
+        }
+        pendingCardio = cardio
+    }
+
+    var pendingCardioDistance: Double? { pendingCardio?.distance }
+
+    func setCardioDistance(_ distance: Double?) {
+        guard var cardio = pendingCardio else { return }
+        if let distance, distance > 0 {
+            cardio.distance = distance
+            if cardio.distanceUnit == nil { cardio.distanceUnit = .km }
+        } else {
+            cardio.distance = nil
+            cardio.distanceUnit = nil
+        }
+        pendingCardio = cardio
+    }
+
+    var pendingCardioDistanceUnit: CardioDistanceUnit { pendingCardio?.distanceUnit ?? .km }
+
+    func setCardioDistanceUnit(_ unit: CardioDistanceUnit) {
+        guard var cardio = pendingCardio else { return }
+        cardio.distanceUnit = unit
+        pendingCardio = cardio
+    }
+
+    /// Cardio is always savable once proposed — the activity has a guaranteed
+    /// fallback and metrics are optional. Mirrors the "never fail" contract.
+    var canSaveCardio: Bool {
+        guard let cardio = pendingCardio else { return false }
+        return !cardio.activity.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Write the pending cardio bout through the store's one cardio write path.
+    /// Independent of the strength session — cardio is logged separately (PR's
+    /// banner copy made real).
+    func saveCardio() {
+        guard let draft = pendingCardio else { return }
+        do {
+            _ = try store.saveCardio(draft)
+            let clean = CardioValidator.normalized(draft)
+            let summary = CardioFormat.summary(durationSeconds: clean.durationSeconds,
+                                               distance: clean.distance,
+                                               distanceUnit: clean.distanceUnit)
+            status = .savedCardio("\(clean.activity) · \(summary)")
+            pendingCardio = nil
+            inputText = ""
+            WidgetRefresher.reload()
+        } catch {
+            status = .failed(Self.message(for: error))
+        }
+    }
+
+    func discardCardio() {
+        pendingCardio = nil
+        inputText = ""
         status = .idle
     }
 

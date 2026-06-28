@@ -38,6 +38,10 @@ final class HistoryModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
+    /// Logged cardio bouts, newest first — shown in their own History section.
+    /// Cardio is stored independently of strength sessions, so it rides alongside
+    /// the session sections rather than inside them.
+    @Published private(set) var cardio: [CardioEntry] = []
     private let store: WorkoutStore
     private let policy: CaloriePolicy
     /// Manual bodyweight (kg) for the calorie estimate; injected for tests. Defaults
@@ -85,8 +89,8 @@ final class HistoryModel: ObservableObject {
         let currentPolicy = policy
         let store = self.store
         do {
-            let sections = try await Task.detached(priority: .userInitiated) {
-                () throws -> [Section] in
+            let result = try await Task.detached(priority: .userInitiated) {
+                () throws -> (sections: [Section], cardio: [CardioEntry]) in
                 let rows = try store.setHistory(since: nil, includeNotes: true)
                 let spans: [Int64: Double]
                 do {
@@ -100,13 +104,18 @@ final class HistoryModel: ObservableObject {
                     #endif
                     spans = [:]
                 }
-                return Self.computeSections(rows: rows, spans: spans,
-                                            bodyweightKg: bodyweight, policy: currentPolicy)
+                let sections = Self.computeSections(rows: rows, spans: spans,
+                                                    bodyweightKg: bodyweight, policy: currentPolicy)
+                let cardio = (try? store.cardioEntries()) ?? []
+                return (sections, cardio)
             }.value
             // A newer `load()` has run since this one started — drop the stale
             // result rather than overwrite the fresher state.
             guard generation == loadGeneration else { return }
-            state = sections.isEmpty ? .empty : .loaded(sections)
+            cardio = result.cardio
+            // History is empty only when there's neither a strength session nor a
+            // cardio bout; cardio-only days still render.
+            state = (result.sections.isEmpty && result.cardio.isEmpty) ? .empty : .loaded(result.sections)
         } catch {
             guard generation == loadGeneration else { return }
             state = .failed("Couldn't load your history.")
@@ -139,6 +148,7 @@ final class HistoryModel: ObservableObject {
 
     func deleteSet(_ id: Int64) { mutate { try store.deleteSet(id) } }
     func deleteSession(_ id: Int64) { mutate { try store.deleteSession(id) } }
+    func deleteCardio(_ id: Int64) { mutate { try store.deleteCardioEntry(id) } }
 
     /// Returns an error message to show in the editor on rejection, or nil on
     /// success (after reloading).

@@ -87,8 +87,12 @@ enum DeterministicParser {
             return sets.map { mapCoreSet($0, name: name, setType: setType, rir: rir, source: original) }
         }
 
-        // `<likely-bw exercise> REPS` with no `x`/`@`/`for` — "pull up 15".
+        // `<likely-bw exercise> REPS` with no `x`/`@`/`for` — "pull up 15". The
+        // name must read like a plain lift: a digit inside it ("chin ups 7 then")
+        // means there's more structure we shouldn't flatten to one set — decline
+        // so the forgiving recovery can read the full rep list instead.
         if core.count == 1, let reps = Int(core[0]), validReps(reps), !name.isEmpty,
+           !name.contains(where: { $0.isNumber }),
            likelyBodyweightExercise(name) {
             let set = CoreSet(weight: 0, reps: reps, unit: defaultUnit, loadKind: .bodyweight)
             return [mapCoreSet(set, name: name, setType: setType, rir: rir, source: original)]

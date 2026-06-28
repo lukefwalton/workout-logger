@@ -202,6 +202,76 @@ final class WorkoutStore: @unchecked Sendable {
         return db.lastInsertRowID
     }
 
+    // MARK: - Cardio (schema v3)
+
+    /// The one cardio write path — the cardio twin of `save`. The parser proposes
+    /// a `CardioDraft`, the confirm card lets the user fix it, and only here is it
+    /// written. `CardioValidator.normalized` coerces rather than rejects (cardio
+    /// never fails to ingest), so the row that lands is always sane.
+    @MainActor
+    @discardableResult
+    func saveCardio(_ draft: CardioDraft) throws -> Int64 {
+        let clean = CardioValidator.normalized(draft)
+        return try db.transaction {
+            let stmt = try db.prepare("""
+                INSERT INTO cardio_entries
+                  (activity, duration_seconds, distance, distance_unit, notes, source_text, logged_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """)
+            defer { stmt.finalize() }
+            stmt.bind(text: clean.activity, at: 1)
+            stmt.bind(optionalInt: clean.durationSeconds, at: 2)
+            stmt.bind(optionalDouble: clean.distance, at: 3)
+            stmt.bind(optionalText: clean.distanceUnit?.rawValue, at: 4)
+            stmt.bind(optionalText: clean.notes, at: 5)
+            stmt.bind(optionalText: clean.sourceText, at: 6)
+            stmt.bind(text: Self.iso(clean.loggedAt), at: 7)
+            stmt.bind(text: Self.iso(Date()), at: 8)
+            try stmt.step()
+            return db.lastInsertRowID
+        }
+    }
+
+    /// Logged cardio bouts, newest first, optionally since a date. Non-isolated
+    /// read so History can fetch off the main thread like `setHistory`.
+    func cardioEntries(since: Date? = nil) throws -> [CardioEntry] {
+        let start = since.map(Self.iso)
+        let stmt = try db.prepare("""
+            SELECT id, activity, duration_seconds, distance, distance_unit, notes, source_text, logged_at
+            FROM cardio_entries
+            WHERE (? IS NULL OR logged_at >= ?)
+            ORDER BY logged_at DESC, id DESC;
+        """)
+        defer { stmt.finalize() }
+        stmt.bind(optionalText: start, at: 1)
+        stmt.bind(optionalText: start, at: 2)
+        var rows: [CardioEntry] = []
+        while try stmt.step() {
+            rows.append(CardioEntry(id: stmt.int(0),
+                                    activity: stmt.text(1) ?? CardioActivity.generic.display,
+                                    durationSeconds: stmt.optionalInt(2),
+                                    distance: stmt.optionalDouble(3),
+                                    distanceUnit: stmt.text(4).flatMap(CardioDistanceUnit.init(rawValue:)),
+                                    notes: stmt.text(5),
+                                    sourceText: stmt.text(6),
+                                    loggedAt: Self.date(stmt.text(7)) ?? Date()))
+        }
+        return rows
+    }
+
+    func cardioCount() throws -> Int { try count("SELECT COUNT(*) FROM cardio_entries;") }
+
+    /// Delete one cardio bout (History swipe-to-delete).
+    @MainActor
+    func deleteCardioEntry(_ id: Int64) throws {
+        try db.transaction {
+            let stmt = try db.prepare("DELETE FROM cardio_entries WHERE id = ?;")
+            defer { stmt.finalize() }
+            stmt.bind(int: id, at: 1)
+            try stmt.step()
+        }
+    }
+
     /// User-facing registry writer for adding a lift before it appears in a log.
     /// Unknown exercises can still be created by `save`, but Settings needs this
     /// explicit path so users can prepare their library without logging a dummy set.
@@ -466,7 +536,46 @@ final class WorkoutStore: @unchecked Sendable {
         let name = Self.normalizeName(rawName)
         guard !name.isEmpty else { throw ParseError.emptyExerciseName }
         if let id = try exerciseID(canonicalNameMatching: name) { return id }
-        return try exerciseID(aliasMatching: name)
+        if let id = try exerciseID(aliasMatching: name) { return id }
+        // Layer 1.5: punctuation/plural-insensitive join. The seed can't list
+        // every spacing/plural variant ("chin ups" alongside "chin up"/"chinup"),
+        // and a missing one used to spawn a duplicate custom on save. This folds
+        // them onto the existing canonical without inventing a fuzzy match: whole
+        // strings must agree once non-alphanumerics and a trailing plural are
+        // stripped, so distinct lifts never collapse. Abbreviations still fall
+        // through to the fuzzy/semantic *proposals* (the confirm card's "Did you
+        // mean…"), which the user confirms.
+        return try exerciseID(looseMatching: name)
+    }
+
+    /// A spacing/punctuation/plural-insensitive key for exercise joining:
+    /// lowercased, non-alphanumerics removed, one trailing plural `s` dropped
+    /// (guarded so short words like "abs" aren't mangled). "Chin-Up", "chin up",
+    /// and "chin ups" all map to "chinup". Applied to both sides of a comparison,
+    /// so equality stays meaningful.
+    static func looseKey(_ raw: String) -> String {
+        var key = String(raw.lowercased().unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) })
+        if key.count > 3, key.hasSuffix("s") { key.removeLast() }
+        return key
+    }
+
+    /// Resolve by loose key against canonical names first, then aliases. O(library
+    /// size); the registry is small (≈90 seeded + customs) and this only runs when
+    /// exact + alias both miss.
+    private func exerciseID(looseMatching rawName: String) throws -> Int64? {
+        let key = Self.looseKey(rawName)
+        guard !key.isEmpty else { return nil }
+        let canon = try db.prepare("SELECT id, canonical_name FROM exercises;")
+        defer { canon.finalize() }
+        while try canon.step() {
+            if Self.looseKey(canon.text(1) ?? "") == key { return canon.int(0) }
+        }
+        let aliases = try db.prepare("SELECT exercise_id, alias FROM exercise_aliases;")
+        defer { aliases.finalize() }
+        while try aliases.step() {
+            if Self.looseKey(aliases.text(1) ?? "") == key { return aliases.int(0) }
+        }
+        return nil
     }
 
     /// Layer 2 (fuzzy) of the resolution stack (§1.1): ranked candidate canonicals

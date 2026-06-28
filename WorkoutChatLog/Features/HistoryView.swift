@@ -104,6 +104,20 @@ struct HistoryView: View {
 
     private func list(_ sections: [HistoryModel.Section]) -> some View {
         List {
+            if !model.cardio.isEmpty {
+                Section {
+                    ForEach(model.cardio) { entry in
+                        cardioRow(entry)
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) { model.deleteCardio(entry.id) } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                    }
+                } header: {
+                    Text("Cardio").font(.headline).textCase(nil)
+                }
+            }
             ForEach(sections) { section in
                 Section {
                     ForEach(section.rows, id: \.setID) { row in
@@ -177,6 +191,21 @@ struct HistoryView: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(row.exerciseName).fontWeight(.semibold)
             Text(Self.summary(for: row)).font(.subheadline).foregroundStyle(.secondary)
+        }
+    }
+
+    private func cardioRow(_ entry: CardioEntry) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.activity).fontWeight(.semibold)
+                Text(CardioFormat.summary(durationSeconds: entry.durationSeconds,
+                                          distance: entry.distance,
+                                          distanceUnit: entry.distanceUnit))
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(HistoryModel.displayDate(WorkoutDateFormat.string(entry.loggedAt)))
+                .font(.caption2).foregroundStyle(Theme.steel)
         }
     }
 
