@@ -163,8 +163,16 @@ enum ForgivingParser {
                 ?? nums.firstIndex(where: { $0 > Double(DeterministicParser.maxPlausibleSetCount) })
             if let wi = weightIdx {
                 let others = values.indices.filter { $0 != wi }
-                let repVal = Int(nums[others[0]])
-                let setVal = Int(nums[others[1]])
+                // Read the two non-weight numbers by where the weight sits:
+                //   weight LAST  ("3x10x135")  → sets × reps × weight  (3 sets, 10 reps)
+                //   weight FIRST ("135x8x3")   → weight × reps × sets  (8 reps, 3 sets)
+                //   weight MID   ("8x160x3")   → reps × weight × sets  (8 reps, 3 sets)
+                let repVal: Int, setVal: Int
+                if wi == values.count - 1 {
+                    setVal = Int(nums[others[0]]); repVal = Int(nums[others[1]])
+                } else {
+                    repVal = Int(nums[others[0]]); setVal = Int(nums[others[1]])
+                }
                 let reps = validReps(repVal) ? [repVal] : []
                 return (nums[wi], parsed[wi]?.unit ?? defaultUnit,
                         (1...99).contains(setVal) ? setVal : nil, reps)

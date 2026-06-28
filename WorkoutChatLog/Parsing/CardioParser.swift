@@ -172,7 +172,10 @@ enum CardioParser {
 
     // MARK: - Distance
 
-    /// First distance found, preferring miles → km → meters. "5k" is km.
+    /// First distance found, preferring miles → km → meters. "5k" is km. NOTE: a
+    /// bare trailing `m` is **meters**, never minutes — pool/erg work needs
+    /// "swim 50m", and minutes have the unambiguous "min" token. So "run 30m" is
+    /// 30 meters by design; the confirm card is the place to correct it.
     static func parseDistance(_ lower: String) -> (value: Double, unit: CardioDistanceUnit)? {
         if let v = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:mi|mile|miles)\b"#, in: lower) {
             return (v, .mi)

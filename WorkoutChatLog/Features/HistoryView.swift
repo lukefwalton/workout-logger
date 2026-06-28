@@ -104,6 +104,10 @@ struct HistoryView: View {
 
     private func list(_ sections: [HistoryModel.Section]) -> some View {
         List {
+            if model.cardioLoadFailed {
+                Label("Couldn't load cardio history", systemImage: "exclamationmark.triangle")
+                    .font(.footnote).foregroundStyle(.orange)
+            }
             if !model.cardio.isEmpty {
                 Section {
                     ForEach(model.cardio) { entry in

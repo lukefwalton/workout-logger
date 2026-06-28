@@ -51,6 +51,14 @@ final class CardioParserTests: XCTestCase {
         XCTAssertEqual(d.durationSeconds, 1500)
     }
 
+    func testBareMeterIsDistanceNotDuration() throws {
+        // Documented decision: bare "m" = meters (use "min" for minutes).
+        let d = try XCTUnwrap(parse("swim 50m"))
+        XCTAssertEqual(d.distance, 50)
+        XCTAssertEqual(d.distanceUnit, .m)
+        XCTAssertNil(d.durationSeconds)
+    }
+
     func testColonTimeIsTotalDuration() throws {
         let d = try XCTUnwrap(parse("bike 1:30:00"))
         XCTAssertEqual(d.durationSeconds, 5400)   // 1h 30m

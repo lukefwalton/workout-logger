@@ -42,6 +42,11 @@ final class HistoryModel: ObservableObject {
     /// Cardio is stored independently of strength sessions, so it rides alongside
     /// the session sections rather than inside them.
     @Published private(set) var cardio: [CardioEntry] = []
+    /// True when the cardio read failed but strength sessions still loaded — a
+    /// partial failure the view surfaces as a small notice, so "cardio failed to
+    /// load" isn't indistinguishable from "no cardio logged". (Cardio-only failure
+    /// already shows as `.failed`.)
+    @Published private(set) var cardioLoadFailed = false
     private let store: WorkoutStore
     private let policy: CaloriePolicy
     /// Manual bodyweight (kg) for the calorie estimate; injected for tests. Defaults
@@ -124,13 +129,15 @@ final class HistoryModel: ObservableObject {
             guard generation == loadGeneration else { return }
             if let loadedCardio = result.cardio {
                 cardio = loadedCardio
+                cardioLoadFailed = false
                 // History is empty only when there's neither a strength session nor
                 // a cardio bout; cardio-only days still render.
                 state = (result.sections.isEmpty && loadedCardio.isEmpty) ? .empty : .loaded(result.sections)
             } else {
-                // Cardio read failed: keep showing strength if there is any, but a
-                // cardio-only user sees a load failure instead of a misleading empty.
+                // Cardio read failed. Cardio-only → surface as .failed; mixed →
+                // show strength and flag the partial cardio failure to the view.
                 cardio = []
+                cardioLoadFailed = !result.sections.isEmpty
                 state = result.sections.isEmpty ? .failed("Couldn't load your history.") : .loaded(result.sections)
             }
         } catch {

@@ -27,6 +27,21 @@ final class ForgivingParserTests: XCTestCase {
         XCTAssertTrue(sets.allSatisfy { $0.loadKind == .external })
     }
 
+    func testWeightLastTriple() throws {
+        // "bench 3x10x135" = sets × reps × weight → 3 sets of 10 @ 135 (not 10×3).
+        let sets = try XCTUnwrap(parse("bench 3x10x135"))
+        XCTAssertEqual(sets.count, 3)
+        XCTAssertTrue(sets.allSatisfy { $0.reps == 10 && $0.weight == 135 })
+        XCTAssertEqual(sets.first?.exerciseName, "bench")
+    }
+
+    func testWeightFirstTriple() throws {
+        // "bench 135x8x3" = weight × reps × sets → 3 sets of 8 @ 135.
+        let sets = try XCTUnwrap(parse("bench 135x8x3"))
+        XCTAssertEqual(sets.count, 3)
+        XCTAssertTrue(sets.allSatisfy { $0.reps == 8 && $0.weight == 135 })
+    }
+
     func testPerSetRepListBodyweight() throws {
         let sets = try XCTUnwrap(parse("chinups 7,3"))
         XCTAssertEqual(sets.map(\.reps), [7, 3])
