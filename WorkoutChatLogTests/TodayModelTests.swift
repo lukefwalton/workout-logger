@@ -802,6 +802,38 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.pendingReps, 8)
     }
 
+    func testPureSchemeRecoversWithoutInventingAName() async {
+        // "8x3x4" names no lift; recovery must leave the exercise blank for the user
+        // to name — never fabricate one. (The FM prompt is held to the same rule;
+        // that path is exercised on-device.)
+        model.inputText = "8x3x4"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingSetCount, 8)
+        XCTAssertEqual(model.pendingReps, 3)
+        XCTAssertTrue(model.pendingExerciseName.isEmpty, "a pure scheme stays nameless until the user names it")
+        XCTAssertFalse(model.canSave, "no exercise yet, so Save stays disabled")
+    }
+
+    func testAliasKnownLiftWithWeightResolvesToExistingExercise() async throws {
+        // "ohp 135" — a known alias + a load. Recovery keeps the typed name, and the
+        // store resolves it to the existing Overhead Press on save, not a new custom
+        // lift. This pins the "save still resolves against the library" contract.
+        let existingID = try XCTUnwrap(try store.resolveExercise("ohp"), "ohp is a seeded alias")
+        model.inputText = "ohp 135"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertFalse(model.pendingCreatesNewExercise, "a known alias resolves to the existing lift, not a new one")
+
+        model.setReps(8)
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        let afterID = try XCTUnwrap(try store.resolveExercise("ohp"))
+        XCTAssertEqual(afterID, existingID,
+                       "save resolved the alias to the same existing lift, creating no new custom row")
+    }
+
     func testCardioStillDeclinesWithGuidance() async {
         // Cardio doesn't fit the set/rep schema — keep the guided card rather
         // than fabricate a weights draft.

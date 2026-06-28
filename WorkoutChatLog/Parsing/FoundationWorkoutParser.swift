@@ -83,9 +83,12 @@ struct FoundationWorkoutParser: WorkoutParsing {
         - "declined": reserve for text that is clearly not a workout at all (chit-chat, \
         notes with no set). Do NOT decline just because the exercise is unknown.
 
-        Always give an exerciseName: the closest known exercise when one clearly matches, \
-        otherwise a clean title-cased name for a new custom lift (set isNewExercise true). \
-        Never refuse because a lift isn't in the known list.
+        Give an exerciseName whenever the line names or clearly implies a lift: the \
+        closest known exercise when one matches, otherwise a clean title-cased name for a \
+        new custom lift (set isNewExercise true). Never refuse just because a lift isn't in \
+        the known list. But if the line is a pure scheme with no exercise at all (e.g. \
+        "5x3", "8x3x4"), leave exerciseName empty — the user names it on the confirm card. \
+        Never invent a lift the user didn't mention.
 
         Ambiguous "A x B" with no weight (e.g. "5x3") is sets × reps: read the first \
         number as the set count, the second as reps, and put a short note in `warning` \
