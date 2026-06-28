@@ -380,9 +380,12 @@ final class TodayModel: ObservableObject {
             break
         }
 
-        // Fold `×` to `x` so the recovery heuristics read it like the grammar does;
-        // the raw text is kept for the set's provenance (`sourceText`).
-        let input = rawInput.replacingOccurrences(of: "×", with: "x")
+        // Fold `×` to `x` so the recovery heuristics read it like the grammar does,
+        // and strip trailing chat punctuation so "bench 135," / "60kg?" still expose
+        // their load. The raw text is kept for the set's provenance (`sourceText`).
+        let input = rawInput
+            .replacingOccurrences(of: "×", with: "x")
+            .trimmingCharacters(in: CharacterSet(charactersIn: " \t\n,.;:?!"))
         let name = TodayInputTokenizer.leadingNamePrefix(input)
 
         // Ambiguous triple form ("8x3x4"): best-effort A sets × B reps, weight left
@@ -519,10 +522,13 @@ final class TodayModel: ObservableObject {
     /// uniform draft; the guard keeps swap honest if per-set editing is ever added.
     private var pendingSetsAreHomogeneous: Bool {
         guard let sets = pending?.sets, let first = sets.first else { return false }
+        // Compare every field swap rewrites from the template (i.e. all but reps),
+        // so the gate exactly matches what `swapSetsAndReps()` would overwrite.
         return sets.allSatisfy {
-            $0.weight == first.weight && $0.unit == first.unit
-                && $0.loadKind == first.loadKind && $0.rir == first.rir
-                && $0.setType == first.setType && $0.notes == first.notes
+            $0.exerciseName == first.exerciseName && $0.weight == first.weight
+                && $0.unit == first.unit && $0.loadKind == first.loadKind
+                && $0.rir == first.rir && $0.setType == first.setType
+                && $0.notes == first.notes && $0.sourceText == first.sourceText
         }
     }
 

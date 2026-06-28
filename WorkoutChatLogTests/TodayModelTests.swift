@@ -797,6 +797,23 @@ final class TodayModelTests: XCTestCase {
         XCTAssertNil(model.pendingReps)
     }
 
+    func testTrailingPunctuationStillExposesTheLoad() async {
+        // Chat-style trailing punctuation must not swallow the load.
+        model.inputText = "bench 135,"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingWeight, 135)
+
+        model.discard()
+        model.inputText = "frobnicator 60kg?"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "frobnicator")
+        XCTAssertTrue(model.pendingCreatesNewExercise)
+        XCTAssertEqual(model.pendingWeight, 60)
+        XCTAssertEqual(model.pendingUnit, .kg)
+    }
+
     func testMultiplicationSignParsesLikeX() async {
         // "135×8" with the Unicode × the confirm card displays should parse exactly
         // like "135x8", not fall through to recovery.
