@@ -19,7 +19,7 @@ privacy posture (no account, no server, Data Not Collected).
 
 Review notes that got it through: [app-store-review-notes.md](../app-store-review-notes.md).
 
-## Post-launch (before v1.0.1)
+## Post-launch (v1.1)
 
 Real gym testing on build 3 exposed parser and logging friction — shorthand that
 didn't match exactly dead-ended, name-only recovery was weak, and several common
@@ -30,10 +30,10 @@ lifts/aliases were missing. Fixes landed on `main` after ship:
 | [#4](https://github.com/lukefwalton/workout-logger/pull/4) | Forgiving set logging, posterior-chain seeds, assisted pull-ups |
 | [#6](https://github.com/lukefwalton/workout-logger/pull/6) | Flexible parser: trailing punctuation, `×` as `x`, `@`-glued loads, lossless swap, recovery drafts keep typed name |
 
-**Next upload:** v1.0.1 (build 4) — bump in `project.yml`, archive, submit as an
+**Next upload:** v1.1 (build 4) — bump in `project.yml`, archive, submit as an
 App Store update with a short "What's New" focused on gym-floor parsing.
 
-### Suggested What's New (v1.0.1)
+### Suggested What's New (v1.1)
 
 ```
 Smoother gym-floor logging: the parser accepts more shorthand variants (× for x,

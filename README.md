@@ -46,7 +46,7 @@ from day one, well before any model is wired up.
 ## Status
 
 **v1.0** — [live on the App Store](https://apps.apple.com/us/app/private-workout-logger/id6782669888)
-(June 2026). **v1.0.1** (build 4) in prep — parser and gym-logging fixes from
+(June 2026). **v1.1** (build 4) in prep — parser and gym-logging fixes from
 post-launch testing. [`docs/learnings/`](docs/learnings/) records what each build
 step taught us; see [024 — App Store shipped](docs/learnings/024-app-store-shipped.md).
 
