@@ -31,8 +31,8 @@ struct ExerciseLibraryView: View {
         .navigationTitle("Exercises")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search)
-        .task { await load() }
-        .refreshable { await load() }
+        .task { load() }
+        .refreshable { load() }
         .alert("Rename exercise", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $renameText).textInputAutocapitalization(.words)
             Button("Rename") { performRename() }
@@ -64,7 +64,7 @@ struct ExerciseLibraryView: View {
                 Button { startRename(exercise) } label: { Label("Rename", systemImage: "pencil") }
                 Button { merging = exercise } label: { Label("Merge into…", systemImage: "arrow.triangle.merge") }
                 if exercise.isCustom && exercise.usageCount == 0 {
-                    Button(role: .destructive) { Task { await performDelete(exercise) } } label: { Label("Delete", systemImage: "trash") }
+                    Button(role: .destructive) { performDelete(exercise) } label: { Label("Delete", systemImage: "trash") }
                 }
             } label: {
                 Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
@@ -133,7 +133,7 @@ struct ExerciseLibraryView: View {
     }
 
     @MainActor
-    private func performDelete(_ exercise: ManagedExercise) async {
+    private func performDelete(_ exercise: ManagedExercise) {
         do { try store.deleteExercise(exercise.id); load() }
         catch { actionError = message(for: error) }
     }

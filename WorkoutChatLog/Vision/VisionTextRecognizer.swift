@@ -47,7 +47,7 @@ struct VisionTextRecognizer: TextRecognizing {
             log.error("text recognition failed: \(error.localizedDescription, privacy: .public)")
             return []
         }
-        let observations = (request.results as? [VNRecognizedTextObservation]) ?? []
+        let observations = request.results ?? []
         return lines(from: observations)
     }
 

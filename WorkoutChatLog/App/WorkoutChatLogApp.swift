@@ -32,7 +32,7 @@ struct WorkoutChatLogApp: App {
                     StartupErrorView(message: startupError)
                 } else {
                     ProgressView("Opening your log…")
-                        .task { await bootstrap() }
+                        .task { bootstrap() }
                 }
             }
             .tint(Theme.tint)

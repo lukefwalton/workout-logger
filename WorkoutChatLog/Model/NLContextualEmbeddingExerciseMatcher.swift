@@ -51,8 +51,7 @@ final class NLContextualEmbeddingExerciseMatcher: ExerciseEmbedding {
     /// nil so the factory substitutes `NoopEmbedding`. English-only at launch (the
     /// seed/library is English); broadening is a later step.
     static func makeIfAvailable() -> NLContextualEmbeddingExerciseMatcher? {
-        guard #available(iOS 17.0, *) else { return nil }
-        return NLContextualEmbeddingExerciseMatcher(language: .english)
+        NLContextualEmbeddingExerciseMatcher(language: .english)
     }
 
     /// Re-checks readiness each call (re-attempting `load()` if assets have since
