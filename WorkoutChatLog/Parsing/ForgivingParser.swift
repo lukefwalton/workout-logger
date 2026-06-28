@@ -260,9 +260,19 @@ enum ForgivingParser {
     }
 
     private static func cleanName(_ tokens: [String], consumed: [Bool]) -> String {
-        let nameTokens = tokens.indices.filter { !consumed[$0] }.map { tokens[$0] }
-            .filter { isNameWord($0) }
-        return cleanExerciseName(nameTokens.joined(separator: " "))
+        let idxs = tokens.indices.filter { !consumed[$0] }
+        var kept: [String] = []
+        for (pos, i) in idxs.enumerated() {
+            let token = tokens[i]
+            if isNameWord(token) { kept.append(token); continue }
+            // Keep a leading/internal numeric token that's part of a name ("45" in
+            // "45 degree back extension") — only when a name word still follows it,
+            // so a trailing stray number isn't pulled in.
+            if Int(token) != nil, idxs[(pos + 1)...].contains(where: { isNameWord(tokens[$0]) }) {
+                kept.append(token)
+            }
+        }
+        return cleanExerciseName(kept.joined(separator: " "))
     }
 
     // MARK: - Bodyweight heuristic (shared with TodayModel's strict-draft default)

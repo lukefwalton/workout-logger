@@ -69,6 +69,14 @@ final class ForgivingParserTests: XCTestCase {
         XCTAssertTrue(sets.allSatisfy { $0.reps == 10 && $0.loadKind == .bodyweight })
     }
 
+    func testNumericPrefixNameIsPreserved() throws {
+        // "45 degree back extension" — the leading number is part of the name, not
+        // a count, so it must survive name cleanup.
+        let sets = try XCTUnwrap(parse("45 degree back extension 8 reps"))
+        XCTAssertEqual(sets.first?.exerciseName, "45 degree back extension")
+        XCTAssertEqual(sets.first?.reps, 8)
+    }
+
     func testSpacedUnitAndPunctuation() throws {
         XCTAssertEqual(try XCTUnwrap(parse("bench 135 lb")).first?.unit, .lb)
         let kg = try XCTUnwrap(parse("frobnicator 60kg?"))

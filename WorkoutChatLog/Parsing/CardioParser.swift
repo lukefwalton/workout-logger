@@ -26,10 +26,6 @@ enum CardioParser {
         guard !original.isEmpty else { return nil }
         let lower = original.lowercased().replacingOccurrences(of: "×", with: "x")
 
-        // A barbell unit means strength, full stop — cardio never carries lb/kg.
-        // Kills "row 135 lb", "bench 135 lb", etc. before any activity guess.
-        if containsWeightUnit(lower) { return nil }
-
         let duration = parseDuration(lower)
         let distance = parseDistance(lower)
         let match = matchActivity(in: lower)
@@ -39,13 +35,14 @@ enum CardioParser {
         // strength path rather than invent a bout.
         guard hasMetric || match != nil else { return nil }
 
-        // Without an explicit duration/distance, commit to cardio only on a *strong*
-        // signal: an activity matched via a keyword that doesn't double as a barbell
-        // lift. "row" is the trap — "row 135" means 135 lb, not a 135-minute row, so
-        // an ambiguous word alone (no "min"/distance) stays strength. Unambiguous
-        // words ("bike", "elliptical", "rowing") still log without a unit. A foreign
-        // exercise word ("walking lunge", "ski squat") also bails.
+        // An explicit duration/distance is decisive — even a weighted ruck
+        // ("walk 5 km with 10 kg pack") is cardio. Strength tells apply ONLY when
+        // there's no metric: a barbell unit ("row 135 lb"), or a lone ambiguous
+        // lift-word ("row 135" is 135 lb, not a 135-minute row). Unambiguous words
+        // ("bike", "elliptical", "rowing") still log without a unit; a foreign
+        // exercise word ("walking lunge", "ski squat") bails.
         if !hasMetric {
+            if containsWeightUnit(lower) { return nil }
             guard let strong = matchActivity(in: lower, excluding: Self.ambiguousActivityWords),
                   !hasForeignWords(lower, matched: strong) else { return nil }
         }
@@ -157,7 +154,8 @@ enum CardioParser {
         if let m = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:min|mins|minute|minutes)\b"#, in: lower) {
             total += Int((m * 60).rounded()); found = true
         }
-        if let s = firstNumber(#"([0-9]+)\s*(?:sec|secs|second|seconds)\b"#, in: lower) {
+        // Bare "s" too ("45s") — longest alternatives first so "seconds" wins.
+        if let s = firstNumber(#"([0-9]+)\s*(?:seconds|second|secs|sec|s)\b"#, in: lower) {
             total += Int(s); found = true
         }
         return found ? total : nil

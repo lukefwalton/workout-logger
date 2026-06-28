@@ -111,9 +111,23 @@ final class CardioParserTests: XCTestCase {
         XCTAssertNil(parse("row 95 x 10"))
     }
 
-    func testWeightUnitForcesStrength() {
+    func testWeightUnitForcesStrengthOnlyWithoutAMetric() throws {
+        // A barbell unit + no duration/distance ⇒ strength.
         XCTAssertNil(parse("bench 135 lb"))
         XCTAssertNil(parse("squat 60kg"))
+        // …but an explicit metric is decisive: weighted cardio is still cardio.
+        let ruck = try XCTUnwrap(parse("walk 5 km with 10 kg pack"))
+        XCTAssertEqual(ruck.activity, "Walk")
+        XCTAssertEqual(ruck.distance, 5)
+        XCTAssertEqual(ruck.distanceUnit, .km)
+    }
+
+    func testSeconds() throws {
+        // The file's own contract lists "45s"; bare-s must read as seconds, not
+        // fall through to minute inference.
+        XCTAssertEqual(try XCTUnwrap(parse("run 45s")).durationSeconds, 45)
+        XCTAssertEqual(try XCTUnwrap(parse("bike 30 sec")).durationSeconds, 30)
+        XCTAssertEqual(try XCTUnwrap(parse("row 90s")).durationSeconds, 90)
     }
 
     func testAmbiguousActivityStillCardioWithExplicitMetric() throws {

@@ -90,7 +90,7 @@ final class HistoryModel: ObservableObject {
         let store = self.store
         do {
             let result = try await Task.detached(priority: .userInitiated) {
-                () throws -> (sections: [Section], cardio: [CardioEntry]) in
+                () throws -> (sections: [Section], cardio: [CardioEntry]?) in
                 let rows = try store.setHistory(since: nil, includeNotes: true)
                 let spans: [Int64: Double]
                 do {
@@ -106,26 +106,33 @@ final class HistoryModel: ObservableObject {
                 }
                 let sections = Self.computeSections(rows: rows, spans: spans,
                                                     bodyweightKg: bodyweight, policy: currentPolicy)
-                let cardio: [CardioEntry]
+                // nil signals a cardio read failure (distinct from "no cardio"),
+                // so the caller can surface it rather than silently show empty.
+                let cardio: [CardioEntry]?
                 do {
                     cardio = try store.cardioEntries()
                 } catch {
-                    // Don't blank strength history over a cardio-only read failure,
-                    // but don't hide it either — surface in DEBUG like sessionSetSpans.
                     #if DEBUG
                     print("[HistoryModel] cardioEntries failed: \(error)")
                     #endif
-                    cardio = []
+                    cardio = nil
                 }
                 return (sections, cardio)
             }.value
             // A newer `load()` has run since this one started — drop the stale
             // result rather than overwrite the fresher state.
             guard generation == loadGeneration else { return }
-            cardio = result.cardio
-            // History is empty only when there's neither a strength session nor a
-            // cardio bout; cardio-only days still render.
-            state = (result.sections.isEmpty && result.cardio.isEmpty) ? .empty : .loaded(result.sections)
+            if let loadedCardio = result.cardio {
+                cardio = loadedCardio
+                // History is empty only when there's neither a strength session nor
+                // a cardio bout; cardio-only days still render.
+                state = (result.sections.isEmpty && loadedCardio.isEmpty) ? .empty : .loaded(result.sections)
+            } else {
+                // Cardio read failed: keep showing strength if there is any, but a
+                // cardio-only user sees a load failure instead of a misleading empty.
+                cardio = []
+                state = result.sections.isEmpty ? .failed("Couldn't load your history.") : .loaded(result.sections)
+            }
         } catch {
             guard generation == loadGeneration else { return }
             state = .failed("Couldn't load your history.")
