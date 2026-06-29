@@ -38,6 +38,15 @@ final class HistoryModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .loading
+    /// Logged cardio bouts, newest first — shown in their own History section.
+    /// Cardio is stored independently of strength sessions, so it rides alongside
+    /// the session sections rather than inside them.
+    @Published private(set) var cardio: [CardioEntry] = []
+    /// True when the cardio read failed but strength sessions still loaded — a
+    /// partial failure the view surfaces as a small notice, so "cardio failed to
+    /// load" isn't indistinguishable from "no cardio logged". (Cardio-only failure
+    /// already shows as `.failed`.)
+    @Published private(set) var cardioLoadFailed = false
     private let store: WorkoutStore
     private let policy: CaloriePolicy
     /// Manual bodyweight (kg) for the calorie estimate; injected for tests. Defaults
@@ -85,8 +94,8 @@ final class HistoryModel: ObservableObject {
         let currentPolicy = policy
         let store = self.store
         do {
-            let sections = try await Task.detached(priority: .userInitiated) {
-                () throws -> [Section] in
+            let result = try await Task.detached(priority: .userInitiated) {
+                () throws -> (sections: [Section], cardio: [CardioEntry]?) in
                 let rows = try store.setHistory(since: nil, includeNotes: true)
                 let spans: [Int64: Double]
                 do {
@@ -100,13 +109,37 @@ final class HistoryModel: ObservableObject {
                     #endif
                     spans = [:]
                 }
-                return Self.computeSections(rows: rows, spans: spans,
-                                            bodyweightKg: bodyweight, policy: currentPolicy)
+                let sections = Self.computeSections(rows: rows, spans: spans,
+                                                    bodyweightKg: bodyweight, policy: currentPolicy)
+                // nil signals a cardio read failure (distinct from "no cardio"),
+                // so the caller can surface it rather than silently show empty.
+                let cardio: [CardioEntry]?
+                do {
+                    cardio = try store.cardioEntries()
+                } catch {
+                    #if DEBUG
+                    print("[HistoryModel] cardioEntries failed: \(error)")
+                    #endif
+                    cardio = nil
+                }
+                return (sections, cardio)
             }.value
             // A newer `load()` has run since this one started — drop the stale
             // result rather than overwrite the fresher state.
             guard generation == loadGeneration else { return }
-            state = sections.isEmpty ? .empty : .loaded(sections)
+            if let loadedCardio = result.cardio {
+                cardio = loadedCardio
+                cardioLoadFailed = false
+                // History is empty only when there's neither a strength session nor
+                // a cardio bout; cardio-only days still render.
+                state = (result.sections.isEmpty && loadedCardio.isEmpty) ? .empty : .loaded(result.sections)
+            } else {
+                // Cardio read failed. Cardio-only → surface as .failed; mixed →
+                // show strength and flag the partial cardio failure to the view.
+                cardio = []
+                cardioLoadFailed = !result.sections.isEmpty
+                state = result.sections.isEmpty ? .failed("Couldn't load your history.") : .loaded(result.sections)
+            }
         } catch {
             guard generation == loadGeneration else { return }
             state = .failed("Couldn't load your history.")
@@ -139,6 +172,7 @@ final class HistoryModel: ObservableObject {
 
     func deleteSet(_ id: Int64) { mutate { try store.deleteSet(id) } }
     func deleteSession(_ id: Int64) { mutate { try store.deleteSession(id) } }
+    func deleteCardio(_ id: Int64) { mutate { try store.deleteCardioEntry(id) } }
 
     /// Returns an error message to show in the editor on rejection, or nil on
     /// success (after reloading).

@@ -76,6 +76,18 @@ struct TodayView: View {
                         .animation(.spring(response: 0.42, dampingFraction: 0.82),
                                    value: model.pending?.startedAt)
 
+                        Group {
+                            if model.pendingCardio != nil {
+                                cardioConfirmCard
+                                    .id(TodayScrollAnchor.confirm)
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                                        removal: .opacity))
+                            }
+                        }
+                        .animation(.spring(response: 0.42, dampingFraction: 0.82),
+                                   value: model.pendingCardio?.id)
+
                         // A running/finished countdown persists across status changes (a
                         // new parse mustn't hide an active rest), so it lives here rather
                         // than only inside the post-save status. The "start rest" prompt
@@ -671,6 +683,106 @@ struct TodayView: View {
         }
     }
 
+    /// Confirm card for a parsed cardio bout — the cardio twin of `confirmCard`.
+    /// Activity is always editable (and pre-filled by the parser); duration and
+    /// distance are optional, so a bout with only one is fine. Save is enabled as
+    /// long as there's an activity — cardio never blocks on missing numbers.
+    private var cardioConfirmCard: some View {
+        card {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Confirm cardio", systemImage: "heart.circle.fill")
+                    .font(.headline)
+                    .foregroundStyle(Theme.ink)
+
+                VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Activity")
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(Theme.steel)
+                        TextField("Activity", text: Binding(
+                            get: { model.pendingCardioActivity },
+                            set: model.setCardioActivity))
+                            .font(.headline)
+                            .textFieldStyle(.plain)
+                            .textInputAutocapitalization(.words)
+                    }
+                    .fieldPill()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Duration (min)")
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(Theme.steel)
+                        TextField("Add minutes", value: Binding(get: { model.pendingCardioMinutes },
+                                                                set: model.setCardioMinutes),
+                                  format: .number)
+                            .font(.headline)
+                            .textFieldStyle(.plain)
+                            .keyboardType(.numberPad)
+                            .accessibilityLabel("Duration in minutes")
+                    }
+                    .fieldPill()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Distance")
+                            .font(.caption).fontWeight(.bold)
+                            .foregroundStyle(Theme.steel)
+                        HStack(spacing: 8) {
+                            TextField("Add distance", value: Binding(get: { model.pendingCardioDistance },
+                                                                     set: model.setCardioDistance),
+                                      format: .number)
+                                .font(.headline)
+                                .textFieldStyle(.plain)
+                                .keyboardType(.decimalPad)
+                                .accessibilityLabel("Distance in \(model.pendingCardioDistanceUnit.label)")
+                            cardioUnitToggle
+                        }
+                    }
+                    .fieldPill()
+                }
+
+                HStack(spacing: 12) {
+                    Button("Discard", role: .destructive, action: model.discardCardio)
+                        .buttonStyle(.bordered)
+                    Button("Log cardio", action: saveCardio)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!model.canSaveCardio)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+            }
+        }
+    }
+
+    /// mi / km / m selector for the cardio distance field. Tap buttons (not a
+    /// segmented picker) so horizontal taps don't fight the tab pager — same
+    /// reasoning as `WeightUnitToggle`.
+    private var cardioUnitToggle: some View {
+        HStack(spacing: 4) {
+            ForEach(CardioDistanceUnit.allCases, id: \.self) { unit in
+                Button {
+                    model.setCardioDistanceUnit(unit)
+                } label: {
+                    Text(unit.label)
+                        .font(.caption).fontWeight(.bold)
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(model.pendingCardioDistanceUnit == unit ? Theme.ocean : Color.clear,
+                                    in: Capsule())
+                        .foregroundStyle(model.pendingCardioDistanceUnit == unit ? Color.white : Theme.steel)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(unit.label) distance unit")
+            }
+        }
+        .padding(3)
+        .background(Theme.steel.opacity(0.12), in: Capsule())
+    }
+
+    private func saveCardio() {
+        dismissKeyboard()
+        model.saveCardio()
+        if case .savedCardio = model.status { scrollRequest = .status }
+        else if case .failed = model.status { scrollRequest = .status }
+    }
+
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(18)
@@ -702,11 +814,11 @@ struct TodayView: View {
     }
 
     private func scrollTargetAfterParse() -> TodayScrollAnchor? {
-        if model.pending != nil { return .confirm }
+        if model.pending != nil || model.pendingCardio != nil { return .confirm }
         switch model.status {
         case .declined, .needsClarification, .failed:
             return .status
-        case .idle, .saved:
+        case .idle, .saved, .savedCardio:
             return nil
         }
     }
@@ -825,6 +937,12 @@ struct TodayView: View {
             }
             .animation(.spring(response: 0.48, dampingFraction: 0.72),
                        value: model.lastAchievements.map(\.id))
+        case .savedCardio(let summary):
+            statusCard(icon: "checkmark.circle.fill",
+                       title: "Logged cardio",
+                       message: "\(summary) · saved locally on this phone.",
+                       color: Theme.kelp)
+                .transition(.move(edge: .top).combined(with: .opacity))
         case .failed(let message):
             statusCard(icon: "exclamationmark.triangle.fill",
                        title: message,

@@ -12,7 +12,7 @@ import Foundation
 /// genuine *post-launch* updates remain non-destructive — that's the future
 /// this protects, not the past.
 enum Schema {
-    static let latestVersion = 2
+    static let latestVersion = 3
 
     enum MigrationError: Error, Equatable, CustomStringConvertible {
         /// A database from before the v1.2 reset (stamped user_version 1 or 2 with
@@ -38,6 +38,7 @@ enum Schema {
             try db.transaction {
                 try db.execute(v1)
                 try db.execute(v2)
+                try db.execute(v3)
                 try db.setUserVersion(latestVersion)
             }
             return
@@ -57,6 +58,12 @@ enum Schema {
             try db.transaction {
                 try db.execute(v2)
                 try db.setUserVersion(2)
+            }
+        }
+        if version < 3 {
+            try db.transaction {
+                try db.execute(v3)
+                try db.setUserVersion(3)
             }
         }
     }
@@ -167,5 +174,28 @@ enum Schema {
         UNIQUE(supplement_id, day)
     );
     CREATE INDEX idx_supplement_intake_day ON supplement_intake(day);
+    """
+
+    // v3: cardio bouts. Cardio is duration/distance based, which the set/rep
+    // `sets` table can't honestly represent — so it gets its own table rather
+    // than polluting strength analytics (e1RM, volume) with fake reps/weight.
+    // Each bout stands alone (no session FK) and is timestamped, like
+    // supplement_intake: "log distance/duration separately" made first-class.
+    // duration_seconds and distance are independently nullable so "30 min",
+    // "5k", and "5k in 25 min" are all representable; distance_unit is a closed
+    // vocabulary the schema enforces.
+    private static let v3 = """
+    CREATE TABLE cardio_entries (
+        id INTEGER PRIMARY KEY,
+        activity TEXT NOT NULL,
+        duration_seconds INTEGER CHECK (duration_seconds IS NULL OR duration_seconds >= 0),
+        distance REAL CHECK (distance IS NULL OR distance >= 0),
+        distance_unit TEXT CHECK (distance_unit IS NULL OR distance_unit IN ('mi','km','m')),
+        notes TEXT,
+        source_text TEXT,
+        logged_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+    CREATE INDEX idx_cardio_logged_at ON cardio_entries(logged_at);
     """
 }

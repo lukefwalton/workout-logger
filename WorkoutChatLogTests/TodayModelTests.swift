@@ -881,13 +881,100 @@ final class TodayModelTests: XCTestCase {
                        "save resolved the alias to the same existing lift, creating no new custom row")
     }
 
-    func testCardioStillDeclinesWithGuidance() async {
-        // Cardio doesn't fit the set/rep schema — keep the guided card rather
-        // than fabricate a weights draft.
+    func testCardioRecoversAsCardioBout() async throws {
+        // Cardio no longer dead-ends — it becomes an editable cardio bout (its own
+        // write path, separate from the strength session).
         model.inputText = "5k 25min"
         await model.parse()
-        XCTAssertNil(model.pending)
-        XCTAssertEqual(model.status, .declined)
-        XCTAssertEqual(model.lastDeclineReason, .cardio)
+        XCTAssertNil(model.pending, "cardio isn't a strength draft")
+        XCTAssertNotNil(model.pendingCardio)
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingCardioDistance, 5)
+        XCTAssertEqual(model.pendingCardioDistanceUnit, .km)
+        XCTAssertEqual(model.pendingCardioMinutes, 25)
+        XCTAssertTrue(model.canSaveCardio)
+
+        model.saveCardio()
+        if case .savedCardio = model.status {} else { XCTFail("expected savedCardio status") }
+        XCTAssertNil(model.pendingCardio)
+        XCTAssertEqual(try store.cardioCount(), 1)
+        XCTAssertEqual(model.inputText, "")
+    }
+
+    func testBikeMinutesBecomesCardio() async throws {
+        model.inputText = "bike 30 min"
+        await model.parse()
+        let cardio = try XCTUnwrap(model.pendingCardio)
+        XCTAssertEqual(cardio.activity, "Cycling")
+        XCTAssertEqual(model.pendingCardioMinutes, 30)
+    }
+
+    func testSubMinuteCardioDurationIsPreservedNotRounded() async throws {
+        model.inputText = "run 45s"
+        await model.parse()
+        let cardio = try XCTUnwrap(model.pendingCardio)
+        XCTAssertEqual(cardio.durationSeconds, 45)
+        XCTAssertNil(model.pendingCardioMinutes, "45s isn't shown as a rounded 1 min")
+        model.saveCardio()
+        let stored = try XCTUnwrap(try store.cardioEntries().first)
+        XCTAssertEqual(stored.durationSeconds, 45, "the exact seconds are saved, not rounded up")
+    }
+
+    func testBodyweightSchemeDefaultsToBodyweight() async {
+        // "chin up 3x10" parses strictly; the model defaults the load-less,
+        // unspecified sets to bodyweight instead of "unspecified × —".
+        model.inputText = "chin up 3x10"
+        await model.parse()
+        XCTAssertEqual(model.pending?.sets.count, 3)
+        XCTAssertEqual(model.pending?.sets.allSatisfy { $0.loadKind == .bodyweight }, true)
+    }
+
+    func testMultiRepBodyweightRecovers() async throws {
+        // "chinups 7,3" — two sets at different rep counts, defaulted to bodyweight.
+        model.inputText = "chinups 7,3"
+        await model.parse()
+        XCTAssertNil(model.pendingCardio)
+        XCTAssertEqual(model.pending?.sets.map { $0.reps }, [7, 3])
+        XCTAssertEqual(model.pending?.sets.allSatisfy { $0.loadKind == .bodyweight }, true)
+        XCTAssertTrue(model.canSave, "valid reps on a recovered bodyweight draft are savable")
+
+        model.save()
+        XCTAssertEqual(model.status, .saved(2))
+        // The variant name folds onto the seeded Chin-Up rather than a new custom.
+        let chinUp = try XCTUnwrap(try store.resolveExercise("chin up"))
+        let stored = try store.sets(inSession: 1)
+        XCTAssertEqual(stored.allSatisfy { $0.exerciseID == chinUp }, true)
+    }
+
+    func testWeightFirstOrderRecovers() async {
+        // "120 lbs leg ext 3 set" — weight-first, name in the middle, "3 set".
+        model.inputText = "120 lbs leg ext 3 set"
+        await model.parse()
+        XCTAssertNil(model.pendingCardio)
+        XCTAssertEqual(model.pendingWeight, 120)
+        XCTAssertEqual(model.pendingUnit, .lb)
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertNil(model.pendingReps, "reps stay unset for the user to fill in")
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "leg ext")
+    }
+
+    func testAmbiguousActivityWordRecoversAsStrengthNotCardio() async {
+        // "row 135" is a barbell row at 135 lb — it must NOT become a 135-minute
+        // rowing bout. Recovers as an editable strength draft instead.
+        model.inputText = "row 135"
+        await model.parse()
+        XCTAssertNil(model.pendingCardio, "an ambiguous lift word + bare weight is strength, not cardio")
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "row")
+    }
+
+    func testWeightInTripleRecovers() async {
+        // "leg curl 8x160x3" → 160 load, 8 reps, 3 sets.
+        model.inputText = "leg curl 8x160x3"
+        await model.parse()
+        XCTAssertEqual(model.pendingWeight, 160)
+        XCTAssertEqual(model.pendingSetCount, 3)
+        XCTAssertEqual(model.pendingReps, 8)
+        XCTAssertEqual(model.pendingExerciseName.lowercased(), "leg curl")
     }
 }
