@@ -4,7 +4,12 @@ labels: ["bug"]
 body:
   - type: markdown
     attributes:
-      value: Thanks for reporting a bug. Fill in what you can — it all helps.
+      value: |
+        Thanks for reporting a bug. Fill in what you can — it all helps.
+
+        **Issues are public.** Please don't post personal health or workout data,
+        and redact anything private from screenshots, HealthKit, or exported
+        files before attaching them.
   - type: textarea
     id: what-happened
     attributes:
@@ -47,6 +52,6 @@ body:
     id: extra
     attributes:
       label: Anything else?
-      description: Screenshots, the shorthand you typed, or other context.
+      description: Screenshots, the shorthand you typed, or other context (redact personal health/workout details — issues are public).
     validations:
       required: false
