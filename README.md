@@ -1,5 +1,11 @@
 # Private Workout Logger
 
+[![iOS Tests](https://github.com/lukefwalton/workout-logger/actions/workflows/ios-tests.yml/badge.svg)](https://github.com/lukefwalton/workout-logger/actions/workflows/ios-tests.yml)
+[![Checks](https://github.com/lukefwalton/workout-logger/actions/workflows/checks.yml/badge.svg)](https://github.com/lukefwalton/workout-logger/actions/workflows/checks.yml)
+[![License: Source-available](https://img.shields.io/badge/License-Source--available-lightgrey.svg)](LICENSE)
+![Platform: iOS 17+](https://img.shields.io/badge/Platform-iOS%2017%2B-lightgrey.svg)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lukefwalton/workout-logger)
+
 > **No subscription. No cloud. No tracking.**
 
 A local-first iOS workout tracker — shorthand logging, on-device parsing, progress

@@ -4,6 +4,9 @@ Private Workout Logger is **public source, copyright Luke F. Walton** — not
 open source (no MIT or similar license). The code is visible so you can verify
 the privacy posture; the App Store build is the official release.
 
+By participating in the issue tracker you agree to abide by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Support & feedback
 
 Having a problem with the app or the repo?
@@ -57,3 +60,5 @@ Group identifier guardrail (`.github/workflows/checks.yml`).
 - Schema changes need migrations and tests.
 
 See [LICENSE](LICENSE) for terms. Third-party reuse is logged in [NOTICE.md](NOTICE.md).
+Found a security or privacy issue? Please report it privately — see
+[SECURITY.md](SECURITY.md).
