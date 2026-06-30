@@ -7,8 +7,8 @@ body:
       value: |
         Ideas are welcome as issues. Note this repo is source-available and
         doesn't accept unsolicited feature PRs — see
-        [CONTRIBUTING](../../CONTRIBUTING.md). Open an issue first so we can
-        agree on the approach.
+        [CONTRIBUTING](https://github.com/lukefwalton/workout-logger/blob/main/CONTRIBUTING.md).
+        Open an issue first so we can agree on the approach.
   - type: textarea
     id: idea
     attributes:

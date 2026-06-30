@@ -10,6 +10,9 @@ body:
         **Issues are public.** Please don't post personal health or workout data,
         and redact anything private from screenshots, HealthKit, or exported
         files before attaching them.
+
+        Found a **security or privacy vulnerability?** Don't file it here — see
+        [SECURITY.md](https://github.com/lukefwalton/workout-logger/blob/main/SECURITY.md).
   - type: textarea
     id: what-happened
     attributes:
