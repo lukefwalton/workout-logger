@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import LFWDesignSystem
 
 /// The first real flow: type a set, parse it, confirm, save. Logic lives in
 /// `TodayModel`; this view is thin presentation over that state.
@@ -779,8 +780,8 @@ struct TodayView: View {
     private func saveCardio() {
         dismissKeyboard()
         model.saveCardio()
-        if case .savedCardio = model.status { scrollRequest = .status }
-        else if case .failed = model.status { scrollRequest = .status }
+        if case .savedCardio = model.status { LFWHaptics.success(); scrollRequest = .status }
+        else if case .failed = model.status { LFWHaptics.failure(); scrollRequest = .status }
     }
 
     private func card<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -827,8 +828,10 @@ struct TodayView: View {
         dismissKeyboard()
         model.save()
         if case .saved = model.status {
+            LFWHaptics.success()
             scrollRequest = .status
         } else if case .failed = model.status {
+            LFWHaptics.failure()
             scrollRequest = .status
         }
     }
