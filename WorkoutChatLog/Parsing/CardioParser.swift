@@ -184,7 +184,9 @@ enum CardioParser {
         if let s = firstNumber(#"([0-9]+)\s*(?:seconds|second|secs|sec|s)\b"#, in: lower) {
             total += safeSeconds(s); found = true
         }
-        return found ? total : nil
+        // Clamp the summed total too, not just each component, so absurd hours AND
+        // minutes together still can't exceed the ceiling.
+        return found ? min(total, maxDurationSeconds) : nil
     }
 
     /// Convert a (possibly absurd or non-finite) seconds value to Int without
