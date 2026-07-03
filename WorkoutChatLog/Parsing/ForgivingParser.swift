@@ -430,15 +430,6 @@ enum ForgivingParser {
         token == "bw" || token == "bodyweight"
     }
 
-    /// Normalize a number's separators: strip grouped-thousands commas ("1,000" →
-    /// "1000") but read a lone comma as a decimal point ("100,5" → "100.5").
-    private static func normalizedNumber(_ s: String) -> String {
-        if s.range(of: #"^[0-9]{1,3}(,[0-9]{3})+$"#, options: .regularExpression) != nil {
-            return s.replacingOccurrences(of: ",", with: "")
-        }
-        return s.replacingOccurrences(of: ",", with: ".")
-    }
-
     private static func weightToken(_ rawToken: String) -> (weight: Double, unit: WeightUnit?)? {
         // Tolerate chat punctuation stuck to a token ("60kg?", "135.") so a load
         // isn't lost to a stray "?" — commas are already their own token.
@@ -446,11 +437,8 @@ enum ForgivingParser {
         if token == "bw" || token == "bodyweight" { return (0, nil) }
         let chars = Array(token)
         var i = 0
-        while i < chars.count, chars[i].isNumber || chars[i] == "." || chars[i] == "," { i += 1 }
-        // Accept a decimal comma ("100,5kg" → 100.5) but keep grouped thousands
-        // ("1,000" → 1000) — kg-locale users write decimals with a comma.
-        guard i > 0,
-              let value = Double(normalizedNumber(String(chars[0..<i]))) else { return nil }
+        while i < chars.count, chars[i].isNumber || chars[i] == "." { i += 1 }
+        guard i > 0, let value = Double(String(chars[0..<i])) else { return nil }
         let suffix = String(chars[i...])
         if suffix.isEmpty { return (value, nil) }
         guard let unit = unitKeyword(suffix) else { return nil }

@@ -42,26 +42,11 @@ final class ForgivingParserTests: XCTestCase {
         XCTAssertTrue(sets.allSatisfy { $0.reps == 8 && $0.weight == 135 })
     }
 
-    func testDecimalCommaWeight() throws {
-        // A kg/lb decimal written with a comma must parse as 120.5, not collapse to
-        // 120 or mis-slot the fractional digit as reps (kg-locale users write "120,5").
-        let sets = try XCTUnwrap(parse("120,5 lbs leg ext 3 set"))
-        XCTAssertEqual(sets.count, 3)
-        XCTAssertTrue(sets.allSatisfy { $0.weight == 120.5 && $0.unit == .lb })
-    }
-
     func testAbsurdXChainClampsInsteadOfCrashing() {
         // Uncapped x-chain values used to trap Int(Double). They now clamp; the point
         // is that parsing returns instead of crashing, with no absurd rep count.
         let sets = ForgivingParser.parse("bench 3x99999999999999999999")
         for s in sets ?? [] { XCTAssertLessThanOrEqual(s.reps, 1000) }
-    }
-
-    func testThousandsSeparatorWeightIsNotDecimal() throws {
-        // "1,000" is 1000, not 1.0 — grouped thousands must survive the comma-decimal fix.
-        let sets = try XCTUnwrap(parse("1,000 lbs leg ext 3 set"))
-        XCTAssertEqual(sets.count, 3)
-        XCTAssertTrue(sets.allSatisfy { $0.weight == 1000 && $0.unit == .lb })
     }
 
     func testPerSetRepListBodyweight() throws {
