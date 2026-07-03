@@ -385,7 +385,11 @@ enum DeterministicParser {
             if c == "@" || c == "," { out += " \(c) "; continue }
             out.append(c)
         }
-        return out.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        // Split on ALL whitespace, newlines included. Space/tab-only splitting
+        // let a pasted "bench 135x8\nsquat 225x5" glue "8\nsquat" into one
+        // token and *silently parse* as a single garbled exercise — the worst
+        // outcome the confident-or-decline contract exists to prevent.
+        return out.split(whereSeparator: { $0.isWhitespace }).map(String.init)
     }
 
     private static func cleanExerciseName(_ raw: String) -> String {
@@ -513,10 +517,11 @@ enum DeterministicParser {
     }
 
     private static func matchesMultiExercise(_ lower: String) -> Bool {
-        // `+` separator (`bench 135x8 + curl 30x10`) is the most common superset
-        // marker; treat it as multi-exercise (declines won't differentiate further
-        // for v1).
-        if lower.contains("+") { return true }
+        // `+` before a fresh name word (`bench 135x8 + curl 30x10`) is the most
+        // common superset marker. A `+` between numbers ("chinups 7+3") is a
+        // rep list, not a second exercise — flagging it here would block the
+        // forgiving recovery that reads it.
+        if lower.range(of: #"\+\s*[a-z]"#, options: .regularExpression) != nil { return true }
         // Two distinct `<word> <number>x<number>` runs separated by a non-comma —
         // a `WORD NUMxNUM WORD NUMxNUM` shape we can't safely split.
         let twoSpecs = #"[a-z]{2,}[^,@]*?\d+\s*x\s*\d+[^,@]*?[a-z]{2,}[^,@]*?\d+\s*x\s*\d+"#

@@ -75,6 +75,13 @@ final class TodayModel: ObservableObject {
     /// at most one card. Cardio is stored on its own write path (`saveCardio`),
     /// independent of the strength session.
     @Published private(set) var pendingCardio: CardioDraft?
+    /// Later segments of a multi-entry line ("bench 135x8 + curl 30x10", a
+    /// pasted multi-line log), waiting their turn. The confirm card holds
+    /// exactly one exercise, so the entries take turns: confirming (or logging
+    /// cardio for) the current one pops the next segment into the input box.
+    /// Cleared by discard / type-it-manually / plan switches — bailing on the
+    /// current entry bails on the rest of the breath too.
+    @Published private(set) var queuedEntries: [String] = []
     @Published private(set) var pendingCreatesNewExercise = false
     /// Layer-2 fuzzy candidates shown above the new-exercise notice when a save
     /// would create a new lift — "Did you mean …?". Tapping one renames; nothing
@@ -265,6 +272,7 @@ final class TodayModel: ObservableObject {
         clearClarificationState()
         pending = nil
         pendingCardio = nil
+        queuedEntries = []
         clearPendingResolutionHints()
         pendingParseSource = nil
         status = .idle
@@ -333,7 +341,13 @@ final class TodayModel: ObservableObject {
             }
 
         case .declined(let reason):
-            // Cardio first: the set/rep schema can't hold duration/distance, so a
+            // Multi-entry lines first ("bench 135x8 + curl 30x10", a pasted
+            // multi-line log): confirm the first segment now and queue the rest.
+            // Ahead of the cardio check on purpose — "bench 135x8 bike 20 min"
+            // must become a bench draft *plus* a queued bout, not one cardio
+            // proposal that silently swallows the bench.
+            if splitIntoQueuedEntries(input) { return }
+            // Cardio next: the set/rep schema can't hold duration/distance, so a
             // line with a cardio signal ("bike 30 min", "ran 5k") becomes a cardio
             // bout the user confirms — never a guessed weight/reps, never a dead-end.
             if let cardio = CardioParser.parse(input) {
@@ -377,11 +391,66 @@ final class TodayModel: ObservableObject {
         }
     }
 
+    // MARK: - Multi-entry split + queue
+
+    /// Re-entrancy guard for `splitIntoQueuedEntries`: applying a segment runs
+    /// back through `apply`, which must not try to split again.
+    private var isApplyingSegment = false
+
+    /// Treat a declined line as several entries in one breath, when that's what
+    /// it is. Splits into candidate segments (`EntrySplitter`) and — only when
+    /// **every** segment independently parses, reads as cardio, or recovers into
+    /// an honest draft — confirms the first and queues the rest. All-or-nothing:
+    /// if any part of the line is unreadable, nothing is split, so no part of
+    /// what the user typed can be silently dropped.
+    private func splitIntoQueuedEntries(_ input: String) -> Bool {
+        guard !isApplyingSegment else { return false }
+        let segments = EntrySplitter.segments(input)
+        guard segments.count >= 2, segments.allSatisfy(isLoggableSegment) else { return false }
+        queuedEntries = Array(segments.dropFirst())
+        isApplyingSegment = true
+        defer { isApplyingSegment = false }
+        applySegment(segments[0])
+        return true
+    }
+
+    /// Whether one segment, on its own, would land somewhere real: a confident
+    /// deterministic parse, a cardio bout, or an honest forgiving recovery.
+    private func isLoggableSegment(_ segment: String) -> Bool {
+        if let sets = DeterministicParser.parse(segment, defaultUnit: UnitPreferences.current()),
+           !sets.isEmpty { return true }
+        if CardioParser.parse(segment) != nil { return true }
+        return recoveredDraft(from: segment,
+                              reason: DeterministicParser.diagnoseDecline(segment)) != nil
+    }
+
+    /// Run one segment back through the decline pipeline it came from. The
+    /// deterministic grammar gets first shot (a clean "curl 30x10" becomes a
+    /// confident draft); anything else re-enters `apply`'s decline branch,
+    /// where the cardio and forgiving-recovery paths do their usual work. The
+    /// FM layer isn't re-consulted per segment — it already saw the full line.
+    private func applySegment(_ segment: String) {
+        if let sets = DeterministicParser.parse(segment, defaultUnit: UnitPreferences.current()),
+           !sets.isEmpty {
+            apply(.draft(WorkoutParseResult(sets: sets, source: .deterministic)), input: segment)
+        } else {
+            apply(.declined(reason: DeterministicParser.diagnoseDecline(segment)), input: segment)
+        }
+    }
+
+    /// Pop the next queued segment (if any) into the input box after a save, so
+    /// the rest of a multi-entry line takes its turn. The user submits it like
+    /// anything else — nothing auto-saves.
+    private func advanceEntryQueue() {
+        inputText = queuedEntries.first ?? ""
+        if !queuedEntries.isEmpty { queuedEntries.removeFirst() }
+    }
+
     /// Salvage an editable draft from a line the parser declined, so the user lands
     /// on the confirm card (and fixes what's missing) instead of a dead-end. Returns
-    /// nil only when a draft would be dishonest — genuine non-workout prose, cardio
-    /// (the set/rep schema doesn't fit), a rep range (the user should pick a count),
-    /// or a multi-exercise line (we'd silently drop a lift).
+    /// nil only when a draft would be dishonest — genuine non-workout prose or a
+    /// multi-exercise line the splitter couldn't take apart (we'd silently drop a
+    /// lift). A rep range recovers with reps left unset — never a picked endpoint.
     ///
     /// What it reads, best-effort:
     ///   • the leading text as the exercise — recognized → its canonical, unknown →
@@ -396,13 +465,15 @@ final class TodayModel: ObservableObject {
     /// reps, RIR, or load.
     private func recoveredDraft(from rawInput: String, reason: ParseDeclineReason?) -> WorkoutDraft? {
         switch reason {
-        case .multiExercise, .repRange:
-            // A draft here would silently lose a lift (multi-exercise) or have to
-            // pick a rep endpoint the user didn't state (rep range); the guided
-            // card is the more honest answer. (Cardio is handled before this is
-            // ever called.)
+        case .multiExercise:
+            // A single-card draft would silently lose a lift, and the
+            // split-and-queue path already had its chance — if it couldn't
+            // split safely, the guided card is the honest answer.
             return nil
-        case .cardio, .incompleteWeight, .ambiguousTripleX, .none:
+        case .repRange, .cardio, .incompleteWeight, .ambiguousTripleX, .none:
+            // A rep range recovers with reps left UNSET (the forgiving parser
+            // consumes the range without picking an endpoint), so the user
+            // chooses the count on the card and Save stays disabled until then.
             break
         }
 
@@ -651,7 +722,7 @@ final class TodayModel: ObservableObject {
             pending = nil
             clearPendingResolutionHints()
             pendingParseSource = nil
-            inputText = ""
+            advanceEntryQueue()   // next segment of a multi-entry line, or ""
             WidgetRefresher.reload()   // the widget shows the open session's set count
         } catch {
             status = .failed(Self.message(for: error))
@@ -775,6 +846,7 @@ final class TodayModel: ObservableObject {
         invalidateInFlightParse()
         pending = nil
         pendingCardio = nil
+        queuedEntries = []
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
@@ -877,7 +949,7 @@ final class TodayModel: ObservableObject {
                                                distanceUnit: clean.distanceUnit)
             status = .savedCardio("\(clean.activity) · \(summary)")
             pendingCardio = nil
-            inputText = ""
+            advanceEntryQueue()   // next segment of a multi-entry line, or ""
             WidgetRefresher.reload()
         } catch {
             status = .failed(Self.message(for: error))
@@ -886,6 +958,7 @@ final class TodayModel: ObservableObject {
 
     func discardCardio() {
         pendingCardio = nil
+        queuedEntries = []
         inputText = ""
         status = .idle
     }
@@ -904,6 +977,7 @@ final class TodayModel: ObservableObject {
         selectedPlannedExerciseID = nil
         inputText = ""
         pending = nil
+        queuedEntries = []
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
@@ -916,6 +990,7 @@ final class TodayModel: ObservableObject {
         selectedPlannedExerciseID = id
         inputText = ""
         pending = nil
+        queuedEntries = []
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
