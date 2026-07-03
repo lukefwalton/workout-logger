@@ -181,6 +181,21 @@ final class DeterministicParserTests: XCTestCase {
     func testDiagnoseMultiExercise() {
         XCTAssertEqual(DeterministicParser.diagnoseDecline("bench 135x8 squat 225x5"), .multiExercise)
         XCTAssertEqual(DeterministicParser.diagnoseDecline("bench 135x8 + curl 30x10"), .multiExercise)
+        XCTAssertEqual(DeterministicParser.diagnoseDecline("bench 135x8\nsquat 225x5"), .multiExercise,
+                       "a pasted multi-line log is a multi-exercise entry, not one garbled lift")
+    }
+
+    func testPlusBetweenNumbersIsNotMultiExercise() {
+        // "7+3" is a rep list; flagging it as multi-exercise would block the
+        // forgiving recovery that can actually read it.
+        XCTAssertNil(DeterministicParser.diagnoseDecline("chinups 7+3"))
+    }
+
+    func testNewlineSeparatedEntriesDecline() {
+        // Space/tab-only tokenizing used to glue "8\nsquat" into one token and
+        // *silently parse* this as a single garbled exercise. It must decline
+        // (and then split upstream) instead.
+        XCTAssertNil(DeterministicParser.parse("bench 135x8\nsquat 225x5"))
     }
 
     func testDiagnoseIncompleteWeight() {

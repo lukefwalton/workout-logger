@@ -105,6 +105,40 @@ final class ForgivingParserTests: XCTestCase {
         XCTAssertEqual(sets.first?.reps, 8)
     }
 
+    func testPlusSeparatedRepList() throws {
+        // "7+3" is a rep list, not a superset — the glued "+" splits like ",".
+        let sets = try XCTUnwrap(parse("chinups 7+3"))
+        XCTAssertEqual(sets.map(\.reps), [7, 3])
+        XCTAssertEqual(sets.first?.exerciseName, "chinups")
+        XCTAssertTrue(sets.allSatisfy { $0.loadKind == .bodyweight })
+    }
+
+    func testRepRangeLeavesRepsUnset() throws {
+        // "8-10" is consumed, never resolved to an endpoint the user didn't
+        // state: the load and name recover, reps stay 0 (the unset sentinel).
+        let sets = try XCTUnwrap(parse("bench 135 8-10"))
+        XCTAssertEqual(sets.count, 1)
+        XCTAssertEqual(sets.first?.weight, 135)
+        XCTAssertEqual(sets.first?.reps, 0, "a range never becomes a picked endpoint")
+        XCTAssertEqual(sets.first?.exerciseName, "bench")
+    }
+
+    func testRepRangeWithGluedSetCount() throws {
+        // "3x8-10" — the number the range hangs off via `x` is the set count.
+        let sets = try XCTUnwrap(parse("curls 3x8-10"))
+        XCTAssertEqual(sets.count, 3)
+        XCTAssertTrue(sets.allSatisfy { $0.reps == 0 })
+        XCTAssertEqual(sets.first?.exerciseName, "curls")
+    }
+
+    func testWordedRepRangeStillRecoversTheLoad() throws {
+        let sets = try XCTUnwrap(parse("rows 8 to 12 at 100"))
+        XCTAssertEqual(sets.count, 1)
+        XCTAssertEqual(sets.first?.weight, 100)
+        XCTAssertEqual(sets.first?.reps, 0)
+        XCTAssertEqual(sets.first?.exerciseName, "rows")
+    }
+
     func testSpacedUnitAndPunctuation() throws {
         XCTAssertEqual(try XCTUnwrap(parse("bench 135 lb")).first?.unit, .lb)
         let kg = try XCTUnwrap(parse("frobnicator 60kg?"))

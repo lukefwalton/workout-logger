@@ -679,9 +679,32 @@ final class TodayModelTests: XCTestCase {
 
     // MARK: - Decline reason surfaced as `lastDeclineReason`
 
-    func testRepRangeEntryProducesARepRangeDeclineReason() async {
-        model.inputText = "bench 8-10"
+    func testRepRangeRecoversWithRepsUnset() async throws {
+        // "bench 135 8-10" used to dead-end on the guided card. It now recovers:
+        // name and load land on the confirm card, reps stay unset — the user
+        // picks the count, never a silently chosen endpoint.
+        model.inputText = "bench 135 8-10"
         await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertNil(model.lastDeclineReason)
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertNil(model.pendingReps, "a rep range never becomes a fabricated count")
+        XCTAssertFalse(model.canSave)
+
+        model.setReps(9)
+        XCTAssertTrue(model.canSave)
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        let stored = try XCTUnwrap(try store.sets(inSession: 1).first)
+        XCTAssertEqual(stored.reps, 9)
+    }
+
+    func testUnrecoverableRepRangeStillShowsGuidedCard() async {
+        // No weight and no recognizable lift — a draft would be a phantom, so
+        // the guided card (with the rep-range reason) is still the answer.
+        model.inputText = "zzqgh 8-10"
+        await model.parse()
+        XCTAssertNil(model.pending)
         XCTAssertEqual(model.status, .declined)
         XCTAssertEqual(model.lastDeclineReason, .repRange)
     }
@@ -691,6 +714,131 @@ final class TodayModelTests: XCTestCase {
         await model.parse()
         XCTAssertEqual(model.status, .declined)
         XCTAssertNil(model.lastDeclineReason)
+    }
+
+    // MARK: - Multi-entry lines: split, confirm, queue
+
+    func testMultiExerciseLineSplitsIntoConfirmPlusQueue() async throws {
+        // "bench 135x8 + curl 30x10" used to dead-end on the guided card. Now
+        // the first entry lands on the confirm card and the second waits its
+        // turn: saving pops it into the input box for its own confirm.
+        model.inputText = "bench 135x8 + curl 30x10"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertNil(model.lastDeclineReason)
+        XCTAssertEqual(model.pendingExerciseName, "bench")
+        XCTAssertEqual(model.pendingWeight, 135)
+        XCTAssertEqual(model.queuedEntries, ["curl 30x10"])
+
+        model.save()
+        XCTAssertEqual(model.status, .saved(1))
+        XCTAssertEqual(model.inputText, "curl 30x10", "saving surfaces the queued entry")
+        XCTAssertTrue(model.queuedEntries.isEmpty)
+
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "curl")
+        XCTAssertEqual(model.pendingWeight, 30)
+        model.save()
+        XCTAssertEqual(model.inputText, "", "an empty queue clears the box as before")
+        XCTAssertEqual(try store.setCount(), 2)
+    }
+
+    func testPastedMultiLineLogSplits() async {
+        // A pasted two-line log — the single-line field can still receive
+        // newlines via paste, and each line must become its own entry.
+        model.inputText = "bench 135x8\nsquat 225x5"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName, "bench")
+        XCTAssertEqual(model.queuedEntries, ["squat 225x5"])
+    }
+
+    func testSpaceSeparatedMultiExerciseSplits() async {
+        model.inputText = "bench 135x8 squat 225x5"
+        await model.parse()
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertEqual(model.pendingExerciseName, "bench")
+        XCTAssertEqual(model.queuedEntries, ["squat 225x5"])
+    }
+
+    func testStrengthPlusCardioSplitsInsteadOfSwallowingTheLift() async throws {
+        // The cardio proposal must not eat the bench: strength confirms first,
+        // the bout queues, and logging it drains the queue.
+        model.inputText = "bench 135x8 bike 20 min"
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "bench")
+        XCTAssertNil(model.pendingCardio)
+        XCTAssertEqual(model.queuedEntries, ["bike 20 min"])
+
+        model.save()
+        XCTAssertEqual(model.inputText, "bike 20 min")
+        await model.parse()
+        XCTAssertNil(model.pending)
+        XCTAssertNotNil(model.pendingCardio)
+        model.saveCardio()
+        XCTAssertEqual(try store.cardioCount(), 1)
+        XCTAssertEqual(model.inputText, "")
+    }
+
+    func testUnsplittableMultiExerciseKeepsGuidedCard() async {
+        // All-or-nothing: when part of the line is unreadable, nothing splits
+        // (no lift silently dropped) and the guided card explains.
+        model.inputText = "bench 135x8 + zzqgh vvwx"
+        await model.parse()
+        XCTAssertNil(model.pending)
+        XCTAssertTrue(model.queuedEntries.isEmpty)
+        XCTAssertEqual(model.status, .declined)
+        XCTAssertEqual(model.lastDeclineReason, .multiExercise)
+    }
+
+    func testDiscardBailsOnTheWholeQueue() async {
+        model.inputText = "bench 135x8 + curl 30x10"
+        await model.parse()
+        XCTAssertEqual(model.queuedEntries, ["curl 30x10"])
+
+        model.discard()
+        XCTAssertNil(model.pending)
+        XCTAssertTrue(model.queuedEntries.isEmpty, "discarding bails on the rest of the line too")
+        XCTAssertEqual(model.inputText, "")
+    }
+
+    func testFreshParseAbandonsAStaleQueue() async {
+        // Retyping over a pending multi-entry confirm abandons its queue: the
+        // stale "curl 30x10" must not resurface after a later, unrelated save.
+        model.inputText = "bench 135x8 + curl 30x10"
+        await model.parse()
+        XCTAssertEqual(model.queuedEntries, ["curl 30x10"])
+
+        model.inputText = "squat 225x5"
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "squat")
+        XCTAssertTrue(model.queuedEntries.isEmpty, "a fresh entry supersedes the abandoned line")
+
+        model.save()
+        XCTAssertEqual(model.inputText, "", "no leftover segment sneaks back into the box")
+    }
+
+    func testThreeEntryQueueDrainsSegmentBySegment() async throws {
+        // Parsing the popped segment (the untouched prefill) *continues* the
+        // queue — only typing something else abandons it.
+        model.inputText = "bench 135x8 + curl 30x10 + pushdowns 50x12"
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "bench")
+        XCTAssertEqual(model.queuedEntries, ["curl 30x10", "pushdowns 50x12"])
+
+        model.save()
+        XCTAssertEqual(model.inputText, "curl 30x10")
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "curl")
+        XCTAssertEqual(model.queuedEntries, ["pushdowns 50x12"], "continuing the queue keeps the tail")
+
+        model.save()
+        XCTAssertEqual(model.inputText, "pushdowns 50x12")
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "pushdowns")
+        model.save()
+        XCTAssertEqual(model.inputText, "")
+        XCTAssertEqual(try store.setCount(), 3)
     }
 
     // MARK: - Sets⇄reps swap + best-effort recovery

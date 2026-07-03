@@ -672,6 +672,8 @@ struct TodayView: View {
                     }
                 }
 
+                queuedEntryHint
+
                 HStack(spacing: 12) {
                     Button("Discard", role: .destructive, action: model.discard)
                         .buttonStyle(.bordered)
@@ -681,6 +683,22 @@ struct TodayView: View {
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
+        }
+    }
+
+    /// The rest of a multi-entry line, waiting its turn: saving the current
+    /// card pops the next segment into the input box (Discard bails on the
+    /// whole line). Shown on both confirm cards so a queued entry is never a
+    /// surprise.
+    @ViewBuilder
+    private var queuedEntryHint: some View {
+        if let next = model.queuedEntries.first {
+            let more = model.queuedEntries.count - 1
+            Label(more > 0 ? "Up next: \(next) (+\(more) more)" : "Up next: \(next)",
+                  systemImage: "arrow.turn.down.right")
+                .font(.caption).fontWeight(.semibold)
+                .foregroundStyle(Theme.steel)
+                .accessibilityLabel("Next entry after saving: \(next)")
         }
     }
 
@@ -740,6 +758,8 @@ struct TodayView: View {
                     }
                     .fieldPill()
                 }
+
+                queuedEntryHint
 
                 HStack(spacing: 12) {
                     Button("Discard", role: .destructive, action: model.discardCardio)
@@ -964,7 +984,7 @@ struct TodayView: View {
         switch reason {
         case .repRange:         return "Pick a single rep count"
         case .cardio:           return "Cardio isn't logged here yet"
-        case .multiExercise:    return "One exercise per line, for now"
+        case .multiExercise:    return "One exercise at a time"
         case .incompleteWeight: return "Add reps to that set"
         case .ambiguousTripleX: return "Looks like 5×5×5 — please rephrase"
         case nil:               return "Couldn't read that one yet"
@@ -978,7 +998,7 @@ struct TodayView: View {
         case .cardio:
             return "Strength sets only at launch. Log distance/duration separately for now."
         case .multiExercise:
-            return "Put each exercise on its own line — \"bench 135x8\" then \"curl 30x10\"."
+            return "That looks like several exercises, but part of it couldn't be read — log each one on its own, like \"bench 135x8\"."
         case .incompleteWeight:
             return "Try a shape like bench 135x8 — a weight on its own can't be saved without reps."
         case .ambiguousTripleX:

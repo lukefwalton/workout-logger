@@ -13,7 +13,9 @@ import Foundation
 /// Shapes it recovers that the strict grammar declines:
 ///   • weight-first prose:        "120 lbs leg ext 3 set"
 ///   • the ambiguous x-triple:    "leg curl 8x160x3"  → 160 lb, 8 reps, 3 sets
-///   • per-set rep lists:         "chinups 7,3" · "chin ups 7 then 3"
+///   • per-set rep lists:         "chinups 7,3" · "chin ups 7 then 3" · "7+3"
+///   • rep ranges:                "bench 135 8-10" → 135 lb, reps left unset
+///                                (never a silently picked endpoint)
 ///   • bodyweight defaulting:     a chin-up / push-up / dip with no load → BW
 ///
 /// Returns nil only when there's no usable signal at all (pure prose). The
@@ -41,6 +43,24 @@ enum ForgivingParser {
             tokens.removeSubrange(i...(i + 1))
         }
 
+        // A rep range ("8-10", "8 – 10", "8 to 10") is consumed, never guessed:
+        // the schema stores one rep count per set, and picking an endpoint the
+        // user didn't state would fabricate data. Consuming it (instead of
+        // choking on it) lets the rest of the line — name, load, a "3x" set
+        // count — still recover, with reps left unset for the confirm card.
+        var rangeSetCount: Int?
+        if let range = repRangeTokenRange(in: tokens) {
+            // "3x8-10": the number the range is glued to via `x` is a set count.
+            let start = range.lowerBound
+            if start >= 2, tokens[start - 1] == "x",
+               let count = Int(tokens[start - 2]), (1...99).contains(count) {
+                rangeSetCount = count
+                tokens.removeSubrange((start - 2)..<range.upperBound)
+            } else {
+                tokens.removeSubrange(range)
+            }
+        }
+
         // `consumed[i] == true` once a token has been claimed (weight, operator,
         // structural number); whatever's left and alphabetic becomes the name.
         var consumed = [Bool](repeating: false, count: tokens.count)
@@ -48,7 +68,7 @@ enum ForgivingParser {
         var weight: Double?
         var unit: WeightUnit?
         var loadIsBodyweight = false
-        var setCount: Int?
+        var setCount: Int? = rangeSetCount
         var reps: [Int] = []
 
         // ── 1. An x-chain anchors the most info: "135x8", "3x10", "8x160x3" ──
@@ -206,6 +226,33 @@ enum ForgivingParser {
         return (nil, nil, (1...99).contains(setVal) ? setVal : nil, validReps(repVal) ? [repVal] : [], false)
     }
 
+    // MARK: - Rep ranges
+
+    /// The token range of the first rep range in `tokens`: a glued "8-10"
+    /// (hyphen / en dash / em dash), or the three-token "8 - 10" / "8 to 10"
+    /// forms. nil when the entry has no range shape.
+    private static func repRangeTokenRange(in tokens: [String]) -> Range<Int>? {
+        for i in tokens.indices {
+            let single = tokens[i].trimmingCharacters(in: CharacterSet(charactersIn: ",;:?!"))
+            if isGluedRepRange(single) { return i..<(i + 1) }
+            if i + 2 < tokens.count,
+               Int(tokens[i]) != nil,
+               isRangeConnector(tokens[i + 1]),
+               Int(tokens[i + 2]) != nil {
+                return i..<(i + 3)
+            }
+        }
+        return nil
+    }
+
+    private static func isGluedRepRange(_ token: String) -> Bool {
+        token.range(of: #"^\d{1,3}[-–—]\d{1,3}$"#, options: .regularExpression) != nil
+    }
+
+    private static func isRangeConnector(_ token: String) -> Bool {
+        token == "to" || token == "-" || token == "–" || token == "—"
+    }
+
     // MARK: - Token scanners
 
     /// First number that is a weight by evidence: a glued/spaced unit, or an "@"
@@ -331,10 +378,14 @@ enum ForgivingParser {
                 let followsGluedUnit = ["kg", "kgs", "lb", "lbs"].contains { prefix.hasSuffix($0) }
                 if nextDigit && (!prevLetter || followsGluedUnit) { out += " x "; continue }
             }
-            if c == "@" || c == "," { out += " \(c) "; continue }
+            // "+" is a rep-list separator ("chinups 7+3") — space it out so the
+            // number-list scanner sees it, exactly like ",".
+            if c == "@" || c == "," || c == "+" { out += " \(c) "; continue }
             out.append(c)
         }
-        return out.split(whereSeparator: { $0 == " " || $0 == "\t" }).map(String.init)
+        // Split on ALL whitespace (newlines included) — a pasted multi-line
+        // entry must tokenize cleanly, not glue "8\nsquat" into one token.
+        return out.split(whereSeparator: { $0.isWhitespace }).map(String.init)
     }
 
     private static func cleanExerciseName(_ raw: String) -> String {
