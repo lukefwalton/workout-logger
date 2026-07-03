@@ -802,6 +802,45 @@ final class TodayModelTests: XCTestCase {
         XCTAssertEqual(model.inputText, "")
     }
 
+    func testFreshParseAbandonsAStaleQueue() async {
+        // Retyping over a pending multi-entry confirm abandons its queue: the
+        // stale "curl 30x10" must not resurface after a later, unrelated save.
+        model.inputText = "bench 135x8 + curl 30x10"
+        await model.parse()
+        XCTAssertEqual(model.queuedEntries, ["curl 30x10"])
+
+        model.inputText = "squat 225x5"
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "squat")
+        XCTAssertTrue(model.queuedEntries.isEmpty, "a fresh entry supersedes the abandoned line")
+
+        model.save()
+        XCTAssertEqual(model.inputText, "", "no leftover segment sneaks back into the box")
+    }
+
+    func testThreeEntryQueueDrainsSegmentBySegment() async throws {
+        // Parsing the popped segment (the untouched prefill) *continues* the
+        // queue — only typing something else abandons it.
+        model.inputText = "bench 135x8 + curl 30x10 + pushdowns 50x12"
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "bench")
+        XCTAssertEqual(model.queuedEntries, ["curl 30x10", "pushdowns 50x12"])
+
+        model.save()
+        XCTAssertEqual(model.inputText, "curl 30x10")
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "curl")
+        XCTAssertEqual(model.queuedEntries, ["pushdowns 50x12"], "continuing the queue keeps the tail")
+
+        model.save()
+        XCTAssertEqual(model.inputText, "pushdowns 50x12")
+        await model.parse()
+        XCTAssertEqual(model.pendingExerciseName, "pushdowns")
+        model.save()
+        XCTAssertEqual(model.inputText, "")
+        XCTAssertEqual(try store.setCount(), 3)
+    }
+
     // MARK: - Sets⇄reps swap + best-effort recovery
 
     func testSwapSetsAndRepsReinterpretsAmbiguousScheme() async {

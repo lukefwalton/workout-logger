@@ -229,6 +229,14 @@ final class TodayModel: ObservableObject {
     /// clarification — it's a new entry, not a reply.
     func parse() async {
         clearClarificationState()
+        // Parsing anything other than the segment just popped from the queue
+        // abandons the rest of that multi-entry line — a stale "curl 30x10"
+        // must not resurface after some later, unrelated save. Parsing the
+        // popped segment itself (even the untouched prefill) continues the
+        // queue, so a three-entry line still drains segment by segment.
+        if inputText.trimmingCharacters(in: .whitespacesAndNewlines) != poppedQueuedEntry {
+            clearEntryQueue()
+        }
         await runParse(input: inputText, context: [])
     }
 
@@ -272,7 +280,7 @@ final class TodayModel: ObservableObject {
         clearClarificationState()
         pending = nil
         pendingCardio = nil
-        queuedEntries = []
+        clearEntryQueue()
         clearPendingResolutionHints()
         pendingParseSource = nil
         status = .idle
@@ -438,12 +446,26 @@ final class TodayModel: ObservableObject {
         }
     }
 
+    /// The queued segment most recently popped into the input box, so `parse()`
+    /// can tell "continuing the queue" (keep the rest) from "typed something
+    /// new" (abandon the rest). Compared against trimmed input.
+    private var poppedQueuedEntry: String?
+
     /// Pop the next queued segment (if any) into the input box after a save, so
     /// the rest of a multi-entry line takes its turn. The user submits it like
     /// anything else — nothing auto-saves.
     private func advanceEntryQueue() {
+        poppedQueuedEntry = queuedEntries.first
         inputText = queuedEntries.first ?? ""
         if !queuedEntries.isEmpty { queuedEntries.removeFirst() }
+    }
+
+    /// Drop the rest of a multi-entry line (and the popped-segment marker).
+    /// Called when the user bails (discard / type-it-manually / plan switches)
+    /// or starts a fresh, unrelated parse.
+    private func clearEntryQueue() {
+        queuedEntries = []
+        poppedQueuedEntry = nil
     }
 
     /// Salvage an editable draft from a line the parser declined, so the user lands
@@ -846,7 +868,7 @@ final class TodayModel: ObservableObject {
         invalidateInFlightParse()
         pending = nil
         pendingCardio = nil
-        queuedEntries = []
+        clearEntryQueue()
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
@@ -958,7 +980,7 @@ final class TodayModel: ObservableObject {
 
     func discardCardio() {
         pendingCardio = nil
-        queuedEntries = []
+        clearEntryQueue()
         inputText = ""
         status = .idle
     }
@@ -977,7 +999,7 @@ final class TodayModel: ObservableObject {
         selectedPlannedExerciseID = nil
         inputText = ""
         pending = nil
-        queuedEntries = []
+        clearEntryQueue()
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
@@ -990,7 +1012,7 @@ final class TodayModel: ObservableObject {
         selectedPlannedExerciseID = id
         inputText = ""
         pending = nil
-        queuedEntries = []
+        clearEntryQueue()
         clearPendingResolutionHints()
         pendingParseSource = nil
         pendingPlannedExerciseID = nil
