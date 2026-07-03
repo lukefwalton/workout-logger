@@ -38,12 +38,11 @@ enum CardioParser {
         let match = matchActivity(in: lower)
         let hasMetric = duration != nil || distance != nil
 
-        // An NxN set spec ("135x5", "3x5") is a strength tell that cardio never uses.
-        // A stray short duration/rest token on the same line ("bench 135x5 2s",
-        // "squat 5x5 rest 90s") must not pull a real strength line into a cardio bout
-        // and silently drop the sets — decline to the strength path even when a metric
-        // is present.
-        if containsSetSpec(lower) { return nil }
+        // An NxN set spec ("135x5", "3x5") with NO cardio activity keyword is a strength
+        // tell. A stray short duration/rest token ("bench 135x5 2s", "squat 5x5 rest 90s")
+        // must not pull a real strength line into a cardio bout and drop the sets. Interval
+        // cardio ("bike 8x20s", "row 10x1 min") carries a cardio activity, so it stays cardio.
+        if containsSetSpec(lower), match == nil { return nil }
 
         // No activity, no duration, no distance → not cardio. Hand back to the
         // strength path rather than invent a bout.
@@ -254,8 +253,17 @@ enum CardioParser {
 
     private static func firstNumber(_ pattern: String, in text: String) -> Double? {
         guard let groups = firstMatch(pattern, in: text), let first = groups[1] else { return nil }
-        // Accept a decimal comma ("1,5" → 1.5) — kg-locale users commonly write it.
-        return Double(first.replacingOccurrences(of: ",", with: "."))
+        return Double(normalizedNumber(first))
+    }
+
+    /// Normalize a captured number's separators: strip grouped-thousands commas
+    /// ("1,000" → "1000") but read a lone comma as a decimal point ("1,5" → "1.5"),
+    /// so decimal-comma support doesn't misread a thousands separator.
+    private static func normalizedNumber(_ s: String) -> String {
+        if s.range(of: #"^[0-9]{1,3}(,[0-9]{3})+$"#, options: .regularExpression) != nil {
+            return s.replacingOccurrences(of: ",", with: "")
+        }
+        return s.replacingOccurrences(of: ",", with: ".")
     }
 
     /// Returns the capture groups of the first match (index 0 = whole match), or

@@ -57,6 +57,13 @@ final class ForgivingParserTests: XCTestCase {
         for s in sets ?? [] { XCTAssertLessThanOrEqual(s.reps, 1000) }
     }
 
+    func testThousandsSeparatorWeightIsNotDecimal() throws {
+        // "1,000" is 1000, not 1.0 — grouped thousands must survive the comma-decimal fix.
+        let sets = try XCTUnwrap(parse("1,000 lbs leg ext 3 set"))
+        XCTAssertEqual(sets.count, 3)
+        XCTAssertTrue(sets.allSatisfy { $0.weight == 1000 && $0.unit == .lb })
+    }
+
     func testPerSetRepListBodyweight() throws {
         let sets = try XCTUnwrap(parse("chinups 7,3"))
         XCTAssertEqual(sets.map(\.reps), [7, 3])

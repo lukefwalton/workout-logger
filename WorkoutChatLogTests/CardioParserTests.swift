@@ -211,4 +211,18 @@ final class CardioParserTests: XCTestCase {
         XCTAssertNil(parse("squat 5x5 rest 90s"))
         XCTAssertNil(parse("bench 3x99999999999999999999"))   // also must not crash
     }
+
+    func testThousandsSeparatorIsNotADecimal() throws {
+        // The decimal-comma fix must not reinterpret grouped thousands.
+        let d = try XCTUnwrap(parse("run 1,000 m"))
+        XCTAssertEqual(d.distance, 1000)
+        XCTAssertEqual(d.distanceUnit, .m)
+    }
+
+    func testIntervalCardioWithSetSpecStaysCardio() throws {
+        // An NxN token alongside a cardio activity is interval cardio, not strength —
+        // it stays on the cardio path (best-effort duration) instead of declining.
+        let d = try XCTUnwrap(parse("bike 8x20s"))
+        XCTAssertEqual(d.activity, "Cycling")
+    }
 }
