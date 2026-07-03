@@ -31,6 +31,13 @@ final class LFWComponentsTests: XCTestCase {
         _ = EmptyView().lfwCard(fill: .white, cornerRadius: LFWRadius.card, padding: 0)
     }
 
+    // LFWStepRow's a11y label uses rendered text, not raw markdown, so VoiceOver
+    // doesn't speak the "**" in a title like "**Open** Settings". Guards the mechanism.
+    func test_markdownStripsToPlainTextForAccessibility() {
+        let rendered = String((try! AttributedString(markdown: "**Open** Settings")).characters)
+        XCTAssertEqual(rendered, "Open Settings")
+    }
+
     private func describeRGB(_ color: Color) -> String {
         #if canImport(UIKit)
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0

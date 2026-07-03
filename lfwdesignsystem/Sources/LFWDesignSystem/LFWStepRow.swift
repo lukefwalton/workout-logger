@@ -47,12 +47,19 @@ public struct LFWStepRow: View {
                 }
             }
         }
-        // Number badge is decorative; expose "step N: title. detail" as one label.
+        // Number badge is decorative; expose "step N: title. detail" as one label,
+        // built from the RENDERED text (markdown stripped) so VoiceOver reads
+        // "Open Settings", not the raw "**Open** Settings".
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("Step \(number). \(title)\(detail.map { ". \($0)" } ?? "")"))
+        .accessibilityLabel(Text("Step \(number). \(plain(title))\(detail.map { ". \(plain($0))" } ?? "")"))
     }
 
     private func attributed(_ markdown: String) -> AttributedString {
         (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
+    }
+
+    /// The rendered plain text of a markdown string (syntax stripped), for the a11y label.
+    private func plain(_ markdown: String) -> String {
+        String(attributed(markdown).characters)
     }
 }
