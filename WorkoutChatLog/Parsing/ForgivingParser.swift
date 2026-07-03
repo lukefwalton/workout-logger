@@ -195,9 +195,9 @@ enum ForgivingParser {
                 //   weight MID   ("8x160x3")   → reps × weight × sets  (8 reps, 3 sets)
                 let repVal: Int, setVal: Int
                 if wi == values.count - 1 {
-                    setVal = Int(nums[others[0]]); repVal = Int(nums[others[1]])
+                    setVal = safeInt(nums[others[0]]); repVal = safeInt(nums[others[1]])
                 } else {
-                    repVal = Int(nums[others[0]]); setVal = Int(nums[others[1]])
+                    repVal = safeInt(nums[others[0]]); setVal = safeInt(nums[others[1]])
                 }
                 let reps = validReps(repVal) ? [repVal] : []
                 let isBW = wi == bwIdx
@@ -206,24 +206,33 @@ enum ForgivingParser {
             }
             // All small, no unit ("5x5x5"): sets × reps, drop the genuinely
             // ambiguous third number.
-            let setVal = Int(nums[0]); let repVal = Int(nums[1])
+            let setVal = safeInt(nums[0]); let repVal = safeInt(nums[1])
             return (nil, nil, (1...99).contains(setVal) ? setVal : nil,
                     validReps(repVal) ? [repVal] : [], false)
         }
 
         // Two numbers. An explicit bw makes the other the reps ("bw x 8" → 8 reps BW).
         if let bw = bwIdx {
-            let repVal = Int(nums[bw == 0 ? 1 : 0])
+            let repVal = safeInt(nums[bw == 0 ? 1 : 0])
             return (0, nil, nil, validReps(repVal) ? [repVal] : [], true)
         }
         // "135x8" (weight×reps) vs "3x10" (sets×reps).
         let firstUnit = parsed[0]?.unit
         if firstUnit != nil || nums[0] > Double(DeterministicParser.maxPlausibleSetCount) {
-            let repVal = Int(nums[1])
+            let repVal = safeInt(nums[1])
             return (nums[0], firstUnit ?? defaultUnit, nil, validReps(repVal) ? [repVal] : [], false)
         }
-        let setVal = Int(nums[0]); let repVal = Int(nums[1])
+        let setVal = safeInt(nums[0]); let repVal = safeInt(nums[1])
         return (nil, nil, (1...99).contains(setVal) ? setVal : nil, validReps(repVal) ? [repVal] : [], false)
+    }
+
+    /// Convert a parsed weight/count value to Int without trapping. `weightToken`
+    /// numbers are uncapped ("...x99999999999999999999"), which would crash Int(Double);
+    /// clamp to just past the plausible-count ceiling so the slot degrades to a count the
+    /// validators reject, instead of crashing.
+    private static func safeInt(_ value: Double) -> Int {
+        guard value.isFinite else { return 0 }
+        return Int(min(max(value.rounded(), 0), Double(DeterministicParser.maxPlausibleSetCount) + 1))
     }
 
     // MARK: - Rep ranges
@@ -428,8 +437,10 @@ enum ForgivingParser {
         if token == "bw" || token == "bodyweight" { return (0, nil) }
         let chars = Array(token)
         var i = 0
-        while i < chars.count, chars[i].isNumber || chars[i] == "." { i += 1 }
-        guard i > 0, let value = Double(String(chars[0..<i])) else { return nil }
+        while i < chars.count, chars[i].isNumber || chars[i] == "." || chars[i] == "," { i += 1 }
+        // Accept a decimal comma ("100,5kg" → 100.5) — kg-locale users write it that way.
+        guard i > 0,
+              let value = Double(String(chars[0..<i]).replacingOccurrences(of: ",", with: ".")) else { return nil }
         let suffix = String(chars[i...])
         if suffix.isEmpty { return (value, nil) }
         guard let unit = unitKeyword(suffix) else { return nil }

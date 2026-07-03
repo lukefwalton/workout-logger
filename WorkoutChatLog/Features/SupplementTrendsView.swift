@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import LFWDesignSystem
 
 /// Loads the last 30 days of supplement intake and computes trends. Self-contained
 /// so it can render in Progress regardless of whether there's any *workout* data.
@@ -44,8 +45,10 @@ final class SupplementTrendsModel: ObservableObject {
 /// streak over the last 30 days, plus a protein-grams trend when there's data.
 struct SupplementTrendsView: View {
     @StateObject private var model: SupplementTrendsModel
+    private let appTab: AppTab
 
-    init(store: WorkoutStore) {
+    init(store: WorkoutStore, appTab: AppTab) {
+        self.appTab = appTab
         _model = StateObject(wrappedValue: SupplementTrendsModel(store: store))
     }
 
@@ -56,7 +59,7 @@ struct SupplementTrendsView: View {
 
             if model.loadFailed {
                 Label("Couldn't load supplement trends.", systemImage: "exclamationmark.triangle")
-                    .font(.footnote).foregroundStyle(.red)
+                    .font(.footnote).foregroundStyle(LFWColors.danger)
             } else if model.trends.isEmpty {
                 Text("Add supplements on the Today tab to track them here.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -77,6 +80,12 @@ struct SupplementTrendsView: View {
         .background(Color.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .shadow(color: Theme.deepSea.opacity(0.08), radius: 16, y: 8)
         .task { model.load() }
+        // Tabs live in a non-lazy stack, so `.task` fires only once at launch; reload
+        // when the Progress tab is (re)shown so adherence/streaks aren't stale until
+        // the app is relaunched.
+        .onChange(of: appTab) { _, tab in
+            if tab == .progress { model.load() }
+        }
     }
 
     private func trendRow(_ trend: SupplementAnalytics.Trend) -> some View {

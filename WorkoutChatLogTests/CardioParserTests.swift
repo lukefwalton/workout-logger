@@ -188,4 +188,27 @@ final class CardioParserTests: XCTestCase {
         XCTAssertNil(parse("did a great workout"))
         XCTAssertNil(parse(""))
     }
+
+    // MARK: - Robustness: overflow, decimal comma, strength-with-stray-duration
+
+    func testAbsurdDurationClampsInsteadOfCrashing() throws {
+        // Uncapped free-text numbers used to trap Int(Double). Now clamped, not crashed.
+        let d = try XCTUnwrap(parse("row 9999999999999999 hours"))
+        XCTAssertEqual(d.durationSeconds, CardioParser.maxDurationSeconds)
+    }
+
+    func testDecimalCommaIsParsed() throws {
+        let km = try XCTUnwrap(parse("bike 1,5 km"))
+        XCTAssertEqual(km.distance, 1.5)
+        XCTAssertEqual(km.distanceUnit, .km)
+        XCTAssertEqual(try XCTUnwrap(parse("ran 2,5 mi")).distance, 2.5)
+    }
+
+    func testStrengthWithStrayDurationTokenIsNotCardio() {
+        // A set spec means the line is strength; the trailing "2s"/"90s" is a
+        // tempo/rest, not a cardio bout — it must not swallow the sets.
+        XCTAssertNil(parse("bench 135x5 2s"))
+        XCTAssertNil(parse("squat 5x5 rest 90s"))
+        XCTAssertNil(parse("bench 3x99999999999999999999"))   // also must not crash
+    }
 }

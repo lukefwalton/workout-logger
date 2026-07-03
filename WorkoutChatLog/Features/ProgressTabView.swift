@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import LFWDesignSystem
 
 /// Named `ProgressTabView` to avoid colliding with SwiftUI's `ProgressView`.
 /// Swift Charts over deterministic, canonical-only aggregates (`ProgressAnalytics`).
@@ -37,7 +38,7 @@ struct ProgressTabView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 workoutSection
-                SupplementTrendsView(store: store)
+                SupplementTrendsView(store: store, appTab: appTab)
             }
             .padding(20)
         }
@@ -63,43 +64,16 @@ struct ProgressTabView: View {
     }
 
     private var workoutsEmptyCard: some View {
-        // Hero-style empty state, modeled on the political onboarding's
-        // HeroIcon + eyebrow + headline rhythm so the Progress tab feels
-        // designed (not stubbed) before the first session lands.
-        VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(Theme.ocean.opacity(0.10))
-                Circle()
-                    .strokeBorder(Theme.gold.opacity(0.55), lineWidth: 1.5)
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 38, weight: .regular))
-                    .foregroundStyle(Theme.ocean)
-            }
-            .frame(width: 96, height: 96)
-            .shadow(color: Theme.deepSea.opacity(0.18), radius: 14, y: 8)
-
-            VStack(spacing: 6) {
-                Text("FRESH SLATE")
-                    .font(.caption2.weight(.heavy))
-                    .kerning(2)
-                    .foregroundStyle(Theme.gold)
-                Text("Charts arrive\nwith your first sets.")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(Theme.ink)
-                    .multilineTextAlignment(.center)
-                Text("Log a few workouts and your e1RM, volume, and per-muscle trends will chart here.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.steel)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 2)
-            }
-        }
-        .padding(.vertical, 28)
-        .padding(.horizontal, 22)
-        .frame(maxWidth: .infinity)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: Theme.deepSea.opacity(0.08), radius: 16, y: 8)
+        // Shared hero empty state (prominent + gold eyebrow) on the family card
+        // surface, instead of a locally re-derived hero glyph.
+        LFWEmptyState(
+            symbol: "chart.line.uptrend.xyaxis",
+            title: "Charts arrive with your first sets.",
+            message: "Log a few workouts and your e1RM, volume, and per-muscle trends will chart here.",
+            eyebrow: "Fresh slate",
+            prominent: true
+        )
+        .lfwCard(fill: .white, padding: 0)
     }
 
     private var loaded: some View {

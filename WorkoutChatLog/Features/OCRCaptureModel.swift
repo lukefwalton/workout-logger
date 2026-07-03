@@ -254,6 +254,11 @@ final class OCRCaptureModel: ObservableObject {
         }
         do {
             let draft = WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: draftSets)
+            // Retire a stale open session (e.g. left open overnight) BEFORE adopting it,
+            // so scanned sets can't merge into a previous day's workout. The Today tab
+            // reconciles via its own path; this importer bypasses it, so it must run the
+            // same guard here — otherwise `save(_:into: nil)` would adopt the stale session.
+            try store.reconcileOpenSession()
             // `into: nil` reuses the active (open) session or lazily opens one, so the
             // confirmed lines append to the same session the Today tab shows, with
             // set_index continued from MAX+1.

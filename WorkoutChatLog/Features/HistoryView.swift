@@ -1,4 +1,5 @@
 import SwiftUI
+import LFWDesignSystem
 
 /// The trust-restoring view: every saved set, grouped by workout, with delete and
 /// edit (set & session). Thin presentation over `HistoryModel`; all writes go
@@ -60,43 +61,18 @@ struct HistoryView: View {
         }
     }
 
-    /// First-run empty state. Borrows the political onboarding HeroIcon's
-    /// circle + gold border + soft shadow so the History tab has a moment of
-    /// quiet design before any data arrives, rather than a system stub.
+    /// First-run empty state, built from the shared `LFWEmptyState` (prominent hero
+    /// variant + gold eyebrow) so the History tab matches the rest of the family
+    /// instead of re-deriving the hero glyph locally.
     private struct HistoryHeroEmpty: View {
         var body: some View {
-            VStack(spacing: 18) {
-                Spacer(minLength: 0)
-                ZStack {
-                    Circle()
-                        .fill(Theme.ocean.opacity(0.10))
-                    Circle()
-                        .strokeBorder(Theme.gold.opacity(0.55), lineWidth: 1.5)
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 42, weight: .regular))
-                        .foregroundStyle(Theme.ocean)
-                }
-                .frame(width: 112, height: 112)
-                .shadow(color: Theme.deepSea.opacity(0.18), radius: 16, y: 10)
-
-                VStack(spacing: 8) {
-                    Text("NO WORKOUTS YET")
-                        .font(.caption.weight(.heavy))
-                        .kerning(2)
-                        .foregroundStyle(Theme.gold)
-                    Text("Every set you log\nlands here.")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(Theme.ink)
-                        .multilineTextAlignment(.center)
-                    Text("Log a set on Today and it'll show up here, grouped by workout, ready to edit or share.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.steel)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 2)
-                }
-                .padding(.horizontal, 28)
-                Spacer(minLength: 0)
-            }
+            LFWEmptyState(
+                symbol: "clock.arrow.circlepath",
+                title: "Every set you log lands here.",
+                message: "Log a set on Today and it'll show up here, grouped by workout, ready to edit or share.",
+                eyebrow: "No workouts yet",
+                prominent: true
+            )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.paper.ignoresSafeArea())
         }
