@@ -38,12 +38,6 @@ enum CardioParser {
         let match = matchActivity(in: lower)
         let hasMetric = duration != nil || distance != nil
 
-        // An NxN set spec ("135x5", "3x5") with NO cardio activity keyword is a strength
-        // tell. A stray short duration/rest token ("bench 135x5 2s", "squat 5x5 rest 90s")
-        // must not pull a real strength line into a cardio bout and drop the sets. Interval
-        // cardio ("bike 8x20s", "row 10x1 min") carries a cardio activity, so it stays cardio.
-        if containsSetSpec(lower), match == nil { return nil }
-
         // No activity, no duration, no distance → not cardio. Hand back to the
         // strength path rather than invent a bout.
         guard hasMetric || match != nil else { return nil }
@@ -121,13 +115,6 @@ enum CardioParser {
             return true
         }
         return lower.range(of: #"[0-9](lb|lbs|kg|kgs)\b"#, options: .regularExpression) != nil
-    }
-
-    /// An NxN set×rep spec ("3x5", "135x5") — the tell that a line is strength, not
-    /// cardio, even when it also carries a stray duration/rest token. `lower` has
-    /// already normalized "×" → "x".
-    private static func containsSetSpec(_ lower: String) -> Bool {
-        lower.range(of: #"[0-9]+\s*x\s*[0-9]+"#, options: .regularExpression) != nil
     }
 
     /// The display name for the bout: the matched canonical, else the user's own

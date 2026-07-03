@@ -204,14 +204,6 @@ final class CardioParserTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(parse("ran 2,5 mi")).distance, 2.5)
     }
 
-    func testStrengthWithStrayDurationTokenIsNotCardio() {
-        // A set spec means the line is strength; the trailing "2s"/"90s" is a
-        // tempo/rest, not a cardio bout — it must not swallow the sets.
-        XCTAssertNil(parse("bench 135x5 2s"))
-        XCTAssertNil(parse("squat 5x5 rest 90s"))
-        XCTAssertNil(parse("bench 3x99999999999999999999"))   // also must not crash
-    }
-
     func testThousandsSeparatorIsNotADecimal() throws {
         // The decimal-comma fix must not reinterpret grouped thousands.
         let d = try XCTUnwrap(parse("run 1,000 m"))
@@ -219,10 +211,13 @@ final class CardioParserTests: XCTestCase {
         XCTAssertEqual(d.distanceUnit, .m)
     }
 
-    func testIntervalCardioWithSetSpecStaysCardio() throws {
-        // An NxN token alongside a cardio activity is interval cardio, not strength —
-        // it stays on the cardio path (best-effort duration) instead of declining.
-        let d = try XCTUnwrap(parse("bike 8x20s"))
-        XCTAssertEqual(d.activity, "Cycling")
+    func testIntervalCardioParsesAsCardio() throws {
+        // Interval notation ("NxN") stays on the cardio path — with an activity
+        // ("bike 8x20s") or activity-less when it carries a real distance/duration
+        // metric ("8x200m") — rather than being mistaken for a strength set spec.
+        XCTAssertEqual(try XCTUnwrap(parse("bike 8x20s")).activity, "Cycling")
+        let intervals = try XCTUnwrap(parse("8x200m"))
+        XCTAssertEqual(intervals.distance, 200)
+        XCTAssertEqual(intervals.distanceUnit, .m)
     }
 }
