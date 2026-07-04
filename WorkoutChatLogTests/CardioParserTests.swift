@@ -188,4 +188,36 @@ final class CardioParserTests: XCTestCase {
         XCTAssertNil(parse("did a great workout"))
         XCTAssertNil(parse(""))
     }
+
+    // MARK: - Robustness: overflow, decimal comma, strength-with-stray-duration
+
+    func testAbsurdDurationClampsInsteadOfCrashing() throws {
+        // Uncapped free-text numbers used to trap Int(Double). Now clamped, not crashed.
+        let d = try XCTUnwrap(parse("row 9999999999999999 hours"))
+        XCTAssertEqual(d.durationSeconds, CardioParser.maxDurationSeconds)
+    }
+
+    func testDecimalCommaIsParsed() throws {
+        let km = try XCTUnwrap(parse("bike 1,5 km"))
+        XCTAssertEqual(km.distance, 1.5)
+        XCTAssertEqual(km.distanceUnit, .km)
+        XCTAssertEqual(try XCTUnwrap(parse("ran 2,5 mi")).distance, 2.5)
+    }
+
+    func testThousandsSeparatorIsNotADecimal() throws {
+        // The decimal-comma fix must not reinterpret grouped thousands.
+        let d = try XCTUnwrap(parse("run 1,000 m"))
+        XCTAssertEqual(d.distance, 1000)
+        XCTAssertEqual(d.distanceUnit, .m)
+    }
+
+    func testIntervalCardioParsesAsCardio() throws {
+        // Interval notation ("NxN") stays on the cardio path — with an activity
+        // ("bike 8x20s") or activity-less when it carries a real distance/duration
+        // metric ("8x200m") — rather than being mistaken for a strength set spec.
+        XCTAssertEqual(try XCTUnwrap(parse("bike 8x20s")).activity, "Cycling")
+        let intervals = try XCTUnwrap(parse("8x200m"))
+        XCTAssertEqual(intervals.distance, 200)
+        XCTAssertEqual(intervals.distanceUnit, .m)
+    }
 }

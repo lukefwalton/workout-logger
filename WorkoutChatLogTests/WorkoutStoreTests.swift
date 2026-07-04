@@ -571,6 +571,43 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(try store.sessionCount(), 2)
     }
 
+    // MARK: - reconcileOpenSession (the OCR / bypass-writer stale-session guard)
+
+    func testReconcileRetiresAStaleOpenSession() throws {
+        // A session opened "today" is stale once `now` is a different local day. The OCR
+        // importer runs this before save(into: nil) so scanned sets can't merge into a
+        // session left open overnight.
+        try seed()
+        _ = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
+                                        sets: [makeSet("Bench Press")]), into: nil)
+        XCTAssertNotNil(try store.currentOpenSession(), "precondition: a session is open")
+
+        try store.reconcileOpenSession(now: Date().addingTimeInterval(2 * 24 * 60 * 60))
+        XCTAssertNil(try store.currentOpenSession(), "a cross-day open session must be retired")
+    }
+
+    func testReconcileKeepsAFreshOpenSession() throws {
+        try seed()
+        let saved = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
+                                                sets: [makeSet("Bench Press")]), into: nil)
+        try store.reconcileOpenSession(now: Date())   // same day, within the gap → adopt
+        XCTAssertEqual(try store.currentOpenSession()?.id, saved.sessionID,
+                       "a same-day session must stay open")
+    }
+
+    func testReconcileThenSaveOpensAFreshSession() throws {
+        // End-to-end OCR guarantee: once a stale session is retired, the next
+        // save(into: nil) opens a NEW session rather than adopting the retired one.
+        try seed()
+        let stale = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
+                                                sets: [makeSet("Bench Press")]), into: nil)
+        try store.reconcileOpenSession(now: Date().addingTimeInterval(2 * 24 * 60 * 60))
+        let fresh = try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil,
+                                                sets: [makeSet("Squat")]), into: nil)
+        XCTAssertNotEqual(fresh.sessionID, stale.sessionID,
+                          "new sets must land in a fresh session, not the retired one")
+    }
+
     func testFinishOnEmptySessionDeletesIt() throws {
         let id = try store.startSession()
         try store.finishSession(id, name: nil, notes: nil, feel: nil, isDeload: false)

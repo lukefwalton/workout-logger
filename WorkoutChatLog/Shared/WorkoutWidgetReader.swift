@@ -64,7 +64,11 @@ enum WorkoutWidgetReader {
         """)
         defer { stmt.finalize() }
         guard try stmt.step() else { return nil }
-        return Int(stmt.int(0))
+        let count = Int(stmt.int(0))
+        // An open session with no sets yet (opened via startSession, nothing logged)
+        // isn't a meaningful "current workout" — fall through to the last finished
+        // session instead of shadowing it with "0 sets · in progress".
+        return count > 0 ? count : nil
     }
 
     /// The most recently finished session as a `.last` snapshot, or nil if none.

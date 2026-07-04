@@ -161,17 +161,29 @@ enum CardioParser {
 
         var total = 0
         var found = false
-        if let h = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:h|hr|hrs|hour|hours)\b"#, in: lower) {
-            total += Int((h * 3600).rounded()); found = true
+        if let h = firstNumber(#"([0-9]+(?:[.,][0-9]+)?)\s*(?:h|hr|hrs|hour|hours)\b"#, in: lower) {
+            total += safeSeconds(h * 3600); found = true
         }
-        if let m = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:min|mins|minute|minutes)\b"#, in: lower) {
-            total += Int((m * 60).rounded()); found = true
+        if let m = firstNumber(#"([0-9]+(?:[.,][0-9]+)?)\s*(?:min|mins|minute|minutes)\b"#, in: lower) {
+            total += safeSeconds(m * 60); found = true
         }
         // Bare "s" too ("45s") — longest alternatives first so "seconds" wins.
         if let s = firstNumber(#"([0-9]+)\s*(?:seconds|second|secs|sec|s)\b"#, in: lower) {
-            total += Int(s); found = true
+            total += safeSeconds(s); found = true
         }
-        return found ? total : nil
+        // Clamp the summed total too, not just each component, so absurd hours AND
+        // minutes together still can't exceed the ceiling.
+        return found ? min(total, maxDurationSeconds) : nil
+    }
+
+    /// Convert a (possibly absurd or non-finite) seconds value to Int without
+    /// trapping. Uncapped free-text numbers can exceed Int.max ("9999999999999999
+    /// hours"), which would crash `Int(Double)`; clamp to a sane ceiling so parsing
+    /// degrades to a correctable outlier instead of crashing.
+    static let maxDurationSeconds = 7 * 24 * 3600   // a week; longer is a typo, not a session
+    private static func safeSeconds(_ value: Double) -> Int {
+        guard value.isFinite, value > 0 else { return 0 }
+        return Int(min(value.rounded(), Double(maxDurationSeconds)))
     }
 
     // MARK: - Distance
@@ -181,13 +193,13 @@ enum CardioParser {
     /// "swim 50m", and minutes have the unambiguous "min" token. So "run 30m" is
     /// 30 meters by design; the confirm card is the place to correct it.
     static func parseDistance(_ lower: String) -> (value: Double, unit: CardioDistanceUnit)? {
-        if let v = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:mi|mile|miles)\b"#, in: lower) {
+        if let v = firstNumber(#"([0-9]+(?:[.,][0-9]+)?)\s*(?:mi|mile|miles)\b"#, in: lower) {
             return (v, .mi)
         }
-        if let v = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:km|kms|kilometer|kilometers|kilometre|kilometres|k)\b"#, in: lower) {
+        if let v = firstNumber(#"([0-9]+(?:[.,][0-9]+)?)\s*(?:km|kms|kilometer|kilometers|kilometre|kilometres|k)\b"#, in: lower) {
             return (v, .km)
         }
-        if let v = firstNumber(#"([0-9]+(?:\.[0-9]+)?)\s*(?:m|meter|meters|metre|metres)\b"#, in: lower) {
+        if let v = firstNumber(#"([0-9]+(?:[.,][0-9]+)?)\s*(?:m|meter|meters|metre|metres)\b"#, in: lower) {
             return (v, .m)
         }
         return nil
@@ -196,7 +208,7 @@ enum CardioParser {
     // MARK: - Helpers
 
     private static func firstBareNumber(in lower: String) -> Double? {
-        firstNumber(#"(?<![0-9.])([0-9]+(?:\.[0-9]+)?)(?![0-9.])"#, in: lower)
+        firstNumber(#"(?<![0-9.,])([0-9]+(?:[.,][0-9]+)?)(?![0-9.,])"#, in: lower)
     }
 
     /// Remove count tokens ("10k steps", "5000 steps", "20 laps") so the rest of
@@ -230,7 +242,17 @@ enum CardioParser {
 
     private static func firstNumber(_ pattern: String, in text: String) -> Double? {
         guard let groups = firstMatch(pattern, in: text), let first = groups[1] else { return nil }
-        return Double(first)
+        return Double(normalizedNumber(first))
+    }
+
+    /// Normalize a captured number's separators: strip grouped-thousands commas
+    /// ("1,000" → "1000") but read a lone comma as a decimal point ("1,5" → "1.5"),
+    /// so decimal-comma support doesn't misread a thousands separator.
+    private static func normalizedNumber(_ s: String) -> String {
+        if s.range(of: #"^[0-9]{1,3}(,[0-9]{3})+$"#, options: .regularExpression) != nil {
+            return s.replacingOccurrences(of: ",", with: "")
+        }
+        return s.replacingOccurrences(of: ",", with: ".")
     }
 
     /// Returns the capture groups of the first match (index 0 = whole match), or

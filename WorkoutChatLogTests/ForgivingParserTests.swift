@@ -42,6 +42,13 @@ final class ForgivingParserTests: XCTestCase {
         XCTAssertTrue(sets.allSatisfy { $0.reps == 8 && $0.weight == 135 })
     }
 
+    func testAbsurdXChainClampsInsteadOfCrashing() {
+        // Uncapped x-chain values used to trap Int(Double). They now clamp; the point
+        // is that parsing returns instead of crashing, with no absurd rep count.
+        let sets = ForgivingParser.parse("bench 3x99999999999999999999")
+        for s in sets ?? [] { XCTAssertLessThanOrEqual(s.reps, 1000) }
+    }
+
     func testPerSetRepListBodyweight() throws {
         let sets = try XCTUnwrap(parse("chinups 7,3"))
         XCTAssertEqual(sets.map(\.reps), [7, 3])

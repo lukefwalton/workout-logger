@@ -359,6 +359,22 @@ final class WorkoutStore: @unchecked Sendable {
         }
     }
 
+    /// Retire the current open session if a reconciler judges it stale (older than the
+    /// gap, or on a different local day), so a subsequent `save(_:into: nil)` can't
+    /// adopt it and merge new sets into a forgotten workout. The Today tab reconciles
+    /// through its own `@Published` path (`TodayModel.reconcileActiveSession`); this is
+    /// the same guard for writers that bypass it (e.g. the OCR importer) and must run
+    /// *before* their `save(_:into: nil)`. A no-op when nothing is open or the open
+    /// session is still fresh.
+    @MainActor
+    func reconcileOpenSession(now: Date = Date(),
+                             reconciler: SessionReconciler = SessionReconciler()) throws {
+        guard let open = try currentOpenSession() else { return }
+        if case .retire(let session) = reconciler.decide(open, now: now) {
+            try finishSession(session.id, name: nil, notes: nil, feel: nil, isDeload: false)
+        }
+    }
+
     /// Open an empty session explicitly, optionally backdated to a past date.
     /// Enforces the single-open invariant: a second open session is rejected.
     /// (The usual way a session begins is lazily, via `save(_:into:)` with nil.)

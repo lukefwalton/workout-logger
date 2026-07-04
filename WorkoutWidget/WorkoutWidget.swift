@@ -45,14 +45,14 @@ struct WorkoutWidgetView: View {
             switch entry.snapshot {
             case .current(let sets):
                 Label("Current workout", systemImage: "figure.strengthtraining.traditional")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(.tint)
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.brandOcean)
                 Text("\(sets) set\(sets == 1 ? "" : "s")")
                     .font(.title2).fontWeight(.bold)
                 Text("in progress").font(.caption).foregroundStyle(.secondary)
 
             case .last(let name, let endedAt, let sets):
                 Label("Last workout", systemImage: "clock.arrow.circlepath")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(.tint)
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.brandOcean)
                 Text((name?.isEmpty == false) ? name! : Self.dateFormatter.string(from: endedAt))
                     .font(.headline).lineLimit(1)
                 Text("\(sets) set\(sets == 1 ? "" : "s") · \(Self.dateFormatter.string(from: endedAt))")
@@ -60,7 +60,7 @@ struct WorkoutWidgetView: View {
 
             case .empty:
                 Label("Private Workout Logger", systemImage: "dumbbell.fill")
-                    .font(.caption).fontWeight(.bold).foregroundStyle(.tint)
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.brandOcean)
                 Text("Log your first set").font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
@@ -69,6 +69,13 @@ struct WorkoutWidgetView: View {
         // Tapping the widget opens the app on the Today tab (quick log).
         .widgetURL(URL(string: "workoutchatlog://today"))
     }
+}
+
+private extension Color {
+    /// The family ocean accent (`LFWColors.ocean`, #1D75BC), inlined because the widget
+    /// target doesn't link LFWDesignSystem. Without this the widget's `.tint` labels fell
+    /// back to system blue instead of the brand accent. Keep in sync with the palette.
+    static let brandOcean = Color(red: 0x1D / 255, green: 0x75 / 255, blue: 0xBC / 255)
 }
 
 struct WorkoutWidget: Widget {
