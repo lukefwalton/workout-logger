@@ -31,13 +31,15 @@ struct ProgressTabView: View {
         }
     }
 
-    // The workout charts handle their own loading/empty/failed states inline, and the
-    // supplement trends always render below them — so someone tracking only
-    // supplements still has a Progress tab worth opening.
+    // The workout charts handle their own loading/empty/failed states inline; the
+    // cardio and supplement trends always render below them — so someone tracking
+    // only cardio or supplements still has a Progress tab worth opening. Order
+    // reads training → conditioning → habits.
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 workoutSection
+                CardioTrendsView(store: store, appTab: appTab)
                 SupplementTrendsView(store: store, appTab: appTab)
             }
             .padding(20)
@@ -167,11 +169,10 @@ struct ProgressTabView: View {
 
     // Per-mark accessibility — VoiceOver reads each datapoint with its date +
     // value instead of the color/position alone. Closes the cross-cutting
-    // audit gap that "color-coded charts had no audio graph".
+    // audit gap that "color-coded charts had no audio graph". The formatter is
+    // the shared cached one (ChartDateLabel) — no per-mark allocation.
     private static func dateAccessibilityLabel(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+        ChartDateLabel.string(date)
     }
 
     private static func formatted(_ value: Double) -> String {

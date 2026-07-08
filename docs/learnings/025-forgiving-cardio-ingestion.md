@@ -63,6 +63,7 @@ canonical*, never merges two canonicals, and only runs after exact + alias miss.
 
 ## Not yet
 
-Cardio isn't in the JSON export/import or the Progress charts or the widget yet,
-and confidence-based auto-join for abbreviations is deferred. All are additive
-follow-ups on top of the v3 table and the loose-key layer.
+Cardio isn't in the JSON export/import or the Progress charts or the widget yet
+(**done since — see 027**), and confidence-based auto-join for abbreviations is
+deferred. All are additive follow-ups on top of the v3 table and the loose-key
+layer.

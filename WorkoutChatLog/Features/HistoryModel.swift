@@ -203,6 +203,10 @@ final class HistoryModel: ObservableObject {
         do {
             try action()
             pendingReload = Task { [weak self] in await self?.load() }
+            // Every History write can change what the widget shows (the last
+            // workout's name/sets, or the last cardio bout) — nudge it from the
+            // one choke point instead of remembering to at each call site.
+            WidgetRefresher.reload()
         } catch {
             state = .failed(message(for: error))
         }
@@ -214,6 +218,7 @@ final class HistoryModel: ObservableObject {
         do {
             try action()
             pendingReload = Task { [weak self] in await self?.load() }
+            WidgetRefresher.reload()
             return nil
         } catch {
             return message(for: error)

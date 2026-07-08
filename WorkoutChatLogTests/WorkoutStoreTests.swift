@@ -511,7 +511,7 @@ final class WorkoutStoreTests: XCTestCase {
                                         ]))
 
         let export = try store.dataExport(includeNotes: false, exportedAt: Date(timeIntervalSince1970: 10))
-        XCTAssertEqual(export.schemaVersion, 2)
+        XCTAssertEqual(export.schemaVersion, 3)
         XCTAssertEqual(export.exportedAt, "1970-01-01T00:00:10Z")
         XCTAssertGreaterThan(export.exercises.count, 0)
         XCTAssertEqual(export.sessions.count, 1)
@@ -523,9 +523,10 @@ final class WorkoutStoreTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         let json = String(data: try encoder.encode(export), encoding: .utf8) ?? ""
-        XCTAssertTrue(json.contains("\"schema_version\":2"))
+        XCTAssertTrue(json.contains("\"schema_version\":3"))
         XCTAssertTrue(json.contains("\"analytics_policy\""))
         XCTAssertTrue(json.contains("\"load\""))
+        XCTAssertTrue(json.contains("\"cardio\""), "the cardio key is always present, even when empty")
     }
 
     // MARK: - Active session lifecycle (PR 3)
