@@ -2,10 +2,11 @@ import WidgetKit
 import SwiftUI
 
 /// Read-only Home Screen widget: the current open workout's set count while one is
-/// active, otherwise the last finished workout. It reads the shared App Group store
-/// through `WorkoutWidgetReader` (its own connection, SELECTs only) and **never
-/// writes**. The app nudges it via `WidgetCenter.reloadAllTimelines()` after each
-/// save/finish; the timeline policy below is just a backstop cadence.
+/// active, otherwise the newer of the last finished workout and the last cardio
+/// bout. It reads the shared App Group store through `WorkoutWidgetReader` (its own
+/// connection, SELECTs only) and **never writes**. The app nudges it via
+/// `WidgetCenter.reloadAllTimelines()` after each save/finish (cardio included);
+/// the timeline policy below is just a backstop cadence.
 ///
 /// NOT COMPILED HERE (Linux, no WidgetKit SDK / Xcode). Correct-by-inspection;
 /// first real verification is an on-device render.
@@ -56,6 +57,16 @@ struct WorkoutWidgetView: View {
                 Text((name?.isEmpty == false) ? name! : Self.dateFormatter.string(from: endedAt))
                     .font(.headline).lineLimit(1)
                 Text("\(sets) set\(sets == 1 ? "" : "s") · \(Self.dateFormatter.string(from: endedAt))")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+
+            case .lastCardio(let activity, let duration, let distance, let unit, let loggedAt):
+                Label("Last cardio", systemImage: CardioActivityIcon.symbol(forActivity: activity))
+                    .font(.caption).fontWeight(.bold).foregroundStyle(Color.brandOcean)
+                Text(activity)
+                    .font(.headline).lineLimit(1)
+                // CardioFormat.summary never returns empty ("logged" floor), so a
+                // metric-less bout still reads as something.
+                Text("\(CardioFormat.summary(durationSeconds: duration, distance: distance, distanceUnit: unit)) · \(Self.dateFormatter.string(from: loggedAt))")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
 
             case .empty:

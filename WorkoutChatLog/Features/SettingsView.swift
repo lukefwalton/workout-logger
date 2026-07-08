@@ -317,8 +317,8 @@ struct SettingsView: View {
     }
 
     private var fullExportConfirmationMessage: String {
-        let notes = includeNotesInFullExport ? "including workout and set notes" : "excluding workout and set notes"
-        return "This creates a local JSON file with all sessions, exercises, loads, reps, RIR, and source text, \(notes). You choose where it goes next."
+        let notes = includeNotesInFullExport ? "including workout, set, and cardio notes" : "excluding workout, set, and cardio notes"
+        return "This creates a local JSON file with all sessions, exercises, loads, reps, RIR, cardio bouts, and source text, \(notes). You choose where it goes next."
     }
 
     @MainActor
@@ -385,19 +385,40 @@ struct SettingsView: View {
         do {
             let summary = try store.importData(fromFileAt: pending.url)
             library = .loaded(try store.exerciseCount())
-            let skipped = summary.skippedSessions > 0 ? " (\(summary.skippedSessions) already present)" : ""
-            importMessage = "Restored \(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets\(skipped)."
+            // A restore can change what the widget shows (a newer last workout, a
+            // newer cardio bout, or first data on a fresh install).
+            WidgetRefresher.reload()
+            var parts: [String] = []
+            if summary.addedSessions > 0 || summary.addedSets > 0 {
+                parts.append("\(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets")
+            }
+            if summary.addedCardio > 0 { parts.append("\(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")") }
+            let skipped = summary.skippedSessions + summary.skippedCardio
+            let suffix = skipped > 0 ? " (\(skipped) already present)" : ""
+            // A fully-duplicate file restores nothing — say that, not "0 workouts."
+            importMessage = parts.isEmpty
+                ? "Nothing new to restore\(suffix)."
+                : "Restored " + parts.joined(separator: " and ") + suffix + "."
         } catch {
             importMessage = "Restore failed — no changes were made."
         }
     }
 
     private func previewMessage(_ summary: ImportSummary) -> String {
-        guard !summary.isEmpty else { return "This backup's data is already present — nothing to add." }
-        var parts = ["Add \(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets"]
+        let addsAnything = summary.addedSessions > 0 || summary.addedSets > 0
+            || summary.addedCardio > 0 || summary.addedExercises > 0
+        // Gate on the added counts, not `isEmpty` — a fully-duplicate backup has
+        // skips but adds nothing, and should read as "already present."
+        guard addsAnything else { return "This backup's data is already present — nothing to add." }
+        var parts: [String] = []
+        if summary.addedSessions > 0 || summary.addedSets > 0 {
+            parts.append("\(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets")
+        }
+        if summary.addedCardio > 0 { parts.append("\(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")") }
         if summary.addedExercises > 0 { parts.append("\(summary.addedExercises) new exercise\(summary.addedExercises == 1 ? "" : "s")") }
-        if summary.skippedSessions > 0 { parts.append("\(summary.skippedSessions) already present") }
-        return parts.joined(separator: " · ") + "."
+        let skipped = summary.skippedSessions + summary.skippedCardio
+        if skipped > 0 { parts.append("\(skipped) already present") }
+        return "Add " + parts.joined(separator: " · ") + "."
     }
 }
 
