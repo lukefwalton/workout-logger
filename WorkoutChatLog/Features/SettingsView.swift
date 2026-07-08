@@ -388,23 +388,37 @@ struct SettingsView: View {
             // A restore can change what the widget shows (a newer last workout, a
             // newer cardio bout, or first data on a fresh install).
             WidgetRefresher.reload()
-            var restored = "Restored \(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets"
-            if summary.addedCardio > 0 { restored += " and \(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")" }
+            var parts: [String] = []
+            if summary.addedSessions > 0 || summary.addedSets > 0 {
+                parts.append("\(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets")
+            }
+            if summary.addedCardio > 0 { parts.append("\(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")") }
             let skipped = summary.skippedSessions + summary.skippedCardio
-            importMessage = restored + (skipped > 0 ? " (\(skipped) already present)" : "") + "."
+            let suffix = skipped > 0 ? " (\(skipped) already present)" : ""
+            // A fully-duplicate file restores nothing — say that, not "0 workouts."
+            importMessage = parts.isEmpty
+                ? "Nothing new to restore\(suffix)."
+                : "Restored " + parts.joined(separator: " and ") + suffix + "."
         } catch {
             importMessage = "Restore failed — no changes were made."
         }
     }
 
     private func previewMessage(_ summary: ImportSummary) -> String {
-        guard !summary.isEmpty else { return "This backup's data is already present — nothing to add." }
-        var parts = ["Add \(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets"]
+        let addsAnything = summary.addedSessions > 0 || summary.addedSets > 0
+            || summary.addedCardio > 0 || summary.addedExercises > 0
+        // Gate on the added counts, not `isEmpty` — a fully-duplicate backup has
+        // skips but adds nothing, and should read as "already present."
+        guard addsAnything else { return "This backup's data is already present — nothing to add." }
+        var parts: [String] = []
+        if summary.addedSessions > 0 || summary.addedSets > 0 {
+            parts.append("\(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets")
+        }
         if summary.addedCardio > 0 { parts.append("\(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")") }
         if summary.addedExercises > 0 { parts.append("\(summary.addedExercises) new exercise\(summary.addedExercises == 1 ? "" : "s")") }
         let skipped = summary.skippedSessions + summary.skippedCardio
         if skipped > 0 { parts.append("\(skipped) already present") }
-        return parts.joined(separator: " · ") + "."
+        return "Add " + parts.joined(separator: " · ") + "."
     }
 }
 

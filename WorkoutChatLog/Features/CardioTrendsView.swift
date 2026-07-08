@@ -91,7 +91,12 @@ struct CardioTrendsView: View {
                 BarMark(x: .value("Week", bar.weekStart), y: .value("Minutes", bar.minutes))
                     .foregroundStyle(by: .value("Activity", bar.activity))
                     .accessibilityLabel("\(bar.activity), week of \(ChartDateLabel.string(bar.weekStart))")
-                    .accessibilityValue("\(Int(bar.minutes.rounded())) minute\(Int(bar.minutes.rounded()) == 1 ? "" : "s")")
+                    // Announce through the shared duration formatter ("7m 30s",
+                    // "45s") — rounding to whole minutes would misstate short
+                    // bouts ("0.33 min" as "0 minutes"), and this card never
+                    // fabricates a metric. A rendered bar always has minutes > 0,
+                    // so the nil fallback is unreachable in practice.
+                    .accessibilityValue(CardioFormat.duration(Int((bar.minutes * 60).rounded())) ?? "0 seconds")
             }
             .frame(height: 200)
         }
