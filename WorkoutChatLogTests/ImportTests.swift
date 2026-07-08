@@ -101,8 +101,10 @@ final class ImportTests: XCTestCase {
 
     private func cardioSignature(_ entries: [CardioEntry]) -> [String] {
         entries.map {
-            "\($0.activity)|\($0.durationSeconds.map(String.init) ?? "-")|\($0.distance.map(String.init) ?? "-")|"
-            + "\($0.distanceUnit?.rawValue ?? "-")|\($0.notes ?? "-")|\($0.sourceText ?? "-")|\(WorkoutDateFormat.string($0.loggedAt))"
+            let duration = $0.durationSeconds.map { String($0) } ?? "-"
+            let distance = $0.distance.map { String($0) } ?? "-"
+            return "\($0.activity)|\(duration)|\(distance)|"
+                + "\($0.distanceUnit?.rawValue ?? "-")|\($0.notes ?? "-")|\($0.sourceText ?? "-")|\(WorkoutDateFormat.string($0.loggedAt))"
         }
     }
 
@@ -154,6 +156,26 @@ final class ImportTests: XCTestCase {
         XCTAssertEqual(second.addedCardio, 0)
         XCTAssertEqual(second.skippedCardio, 2)
         XCTAssertEqual(try fresh.cardioCount(), 2)
+    }
+
+    func testCardioDedupIgnoresNotesAndSourceText() throws {
+        // Deliberate: notes and source_text are NOT part of the bout's identity,
+        // so a notes-excluded export stays idempotent against a store whose same
+        // bouts carry notes (and vice versa). Same time + activity + metrics =
+        // same bout, regardless of prose.
+        let source = try makeStore("csrc6")
+        let when = Date(timeIntervalSince1970: 700)
+        try source.saveCardio(makeCardio("Run", seconds: 1800, notes: "with notes",
+                                         sourceText: "ran 30", at: when))
+        let notesExcluded = try source.dataExport(includeNotes: false)
+
+        let dest = try makeStore("cdst6")
+        try dest.saveCardio(makeCardio("Run", seconds: 1800, notes: "different words entirely",
+                                       sourceText: "jogged half an hour", at: when))
+        let summary = try dest.importData(notesExcluded)
+        XCTAssertEqual(summary.addedCardio, 0, "same time + activity + metrics is the same bout")
+        XCTAssertEqual(summary.skippedCardio, 1)
+        XCTAssertEqual(try dest.cardioCount(), 1)
     }
 
     func testDryRunPreviewsCardioWithoutWriting() throws {

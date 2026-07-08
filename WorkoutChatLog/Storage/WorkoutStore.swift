@@ -1319,17 +1319,23 @@ final class WorkoutStore: @unchecked Sendable {
         try stmt.step()
     }
 
-    /// The cardio idempotency fingerprint, over the *normalized* fields (what
-    /// actually lands in the table) plus the verbatim logged_at string. Joined
-    /// on the unit-separator control character so a free-text activity (or a
-    /// hand-edited timestamp) containing a printable delimiter can't collide
-    /// two distinct bouts into one key.
+    /// The cardio idempotency fingerprint, over the *normalized* metric fields
+    /// (what actually lands in the table) plus the verbatim logged_at string.
+    /// `notes` and `source_text` are deliberately excluded: a notes-excluded
+    /// export must stay idempotent against a store that has the same bouts with
+    /// notes (and vice versa) — same time + activity + metrics is "the same
+    /// bout", regardless of prose. Joined on the unit-separator control
+    /// character so a free-text activity (or a hand-edited timestamp) containing
+    /// a printable delimiter can't collide two distinct bouts into one key.
     private static func cardioFingerprint(loggedAt: String, clean: CardioDraft) -> String {
-        [loggedAt,
-         clean.activity,
-         clean.durationSeconds.map(String.init) ?? "∅",
-         clean.distance.map(String.init) ?? "∅",
-         clean.distanceUnit?.rawValue ?? "∅"].joined(separator: "\u{1F}")
+        let parts: [String] = [
+            loggedAt,
+            clean.activity,
+            clean.durationSeconds.map { String($0) } ?? "∅",
+            clean.distance.map { String($0) } ?? "∅",
+            clean.distanceUnit?.rawValue ?? "∅",
+        ]
+        return parts.joined(separator: "\u{1F}")
     }
 
     /// How many stored bouts already match an imported bout's fingerprint. `IS ?`
