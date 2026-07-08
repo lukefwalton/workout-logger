@@ -1,6 +1,7 @@
 # App Store Review Notes — Private Workout Logger
 
-**Status:** v1.0 approved and released June 2026 —
+**Status:** v1.0 approved June 2026; **v1.1** shipped (build 4); **v1.2** in review
+prep (build 5) —
 [App Store listing](https://apps.apple.com/us/app/private-workout-logger/id6782669888).
 Keep these notes for future updates; paste into App Store Connect → App Review
 Information → Notes when submitting a new version.
@@ -32,9 +33,10 @@ Intelligence all unavailable or denied:
 Suggested smoke test on a clean install:
 1. Decline every permission prompt.
 2. Today tab → type `bench 135x8` → Save. → A set is logged locally.
-3. History tab → the workout appears; set a bodyweight in Settings → a rough
+3. Today tab → type `run 20 min` → Save. → Cardio is logged (v1.2+).
+4. History tab → the workout appears; set a bodyweight in Settings → a rough
    calorie estimate shows.
-4. Progress tab → trends render from local data.
+5. Progress tab → strength trends and cardio charts render from local data.
 
 ## Data: not collected
 

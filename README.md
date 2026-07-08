@@ -51,10 +51,11 @@ from day one, well before any model is wired up.
 
 ## Status
 
-**v1.0** — [live on the App Store](https://apps.apple.com/us/app/private-workout-logger/id6782669888)
-(June 2026). **v1.1** (build 4) in prep — parser and gym-logging fixes from
-post-launch testing. [`docs/learnings/`](docs/learnings/) records what each build
-step taught us; see [024 — App Store shipped](docs/learnings/024-app-store-shipped.md).
+**[Live on the App Store](https://apps.apple.com/us/app/private-workout-logger/id6782669888)**
+— **v1.1** shipped (build 4). **v1.2** (build 5) in prep: cardio everywhere,
+parser reliability, design refresh. [`docs/learnings/`](docs/learnings/) records
+what each build taught us; release history in
+[024 — App Store shipped](docs/learnings/024-app-store-shipped.md).
 
 Shipped in v1.0:
 - XcodeGen project (app + widget + unit-test targets), SwiftUI four-tab shell
@@ -81,6 +82,15 @@ Shipped in v1.0:
 
 Not in v1.0: cloud sync (and by doctrine, cloud would only ever be an opt-in
 experiment, never a tier or a dependency).
+
+**v1.1** (June 2026): forgiving parser (`×`, `@`-glued loads, trailing punctuation),
+posterior-chain seeds, assisted pull-ups, Xcode warning cleanup.
+
+**v1.2** (in prep): cardio logging + Progress charts + widget + JSON export/import
+([025](docs/learnings/025-forgiving-cardio-ingestion.md),
+[027](docs/learnings/027-cardio-first-class.md)); never-dead-end parsing
+([026](docs/learnings/026-multi-entry-splitting.md)); parser/OCR bug fixes;
+green rebrand + new app icon; LFWDesignSystem 2.x shared chrome.
 
 ## Building
 
