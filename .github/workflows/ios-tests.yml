@@ -3,6 +3,14 @@ name: iOS Tests
 # Builds the app + widget extension and runs the Swift unit suite on a macOS
 # runner. The Xcode project is generated from project.yml by XcodeGen, and the
 # build links the vendored lfwdesignsystem Swift Package at the repo root.
+#
+# Two jobs, deliberately on different runners:
+#   - unit-tests (macos-14): the shipping-floor build + test run.
+#   - foundation-models-guard (macos-26): proves the
+#     `#if canImport(FoundationModels)` branch actually compiles. On any
+#     toolchain without that SDK the app still builds green using only the
+#     deterministic fallback, so without this job the FM parser could silently
+#     drop out of CI coverage.
 
 on:
   pull_request:
@@ -82,3 +90,58 @@ jobs:
             -scheme WorkoutChatLog \
             -destination "$DEST" \
             CODE_SIGNING_ALLOWED=NO
+
+  foundation-models-guard:
+    name: Foundation Models compile guard
+    runs-on: macos-26
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      # The build alone can never prove the FM branch compiled: on a toolchain
+      # without the SDK, `canImport` quietly selects the fallback and the build
+      # stays green. This probe makes absence loud — it type-checks a file that
+      # #errors unless FoundationModels is importable with this runner's iOS
+      # simulator SDK. If GitHub's default Xcode on this image ever regresses
+      # below the required SDK, this step (not a silent fallback) is what fails.
+      - name: Assert FoundationModels is importable
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          cat > "$RUNNER_TEMP/fm_probe.swift" <<'SWIFT'
+          #if canImport(FoundationModels)
+          import FoundationModels
+          #else
+          #error("FoundationModels SDK missing from this toolchain — the on-device parser would silently compile out")
+          #endif
+          SWIFT
+          SDK_PATH=$(xcrun --sdk iphonesimulator --show-sdk-path)
+          SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          echo "iphonesimulator SDK: $SDK_VERSION at $SDK_PATH"
+          xcrun swiftc -typecheck \
+            -sdk "$SDK_PATH" \
+            -target "arm64-apple-ios${SDK_VERSION}-simulator" \
+            "$RUNNER_TEMP/fm_probe.swift"
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # With the probe green, `canImport(FoundationModels)` is true here, so
+      # this build genuinely compiles FoundationWorkoutParser and the FM side
+      # of the orchestrator — catching symbol drift the macos-14 job can't see.
+      - name: Build with the FM branch compiled in
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -scheme WorkoutChatLog \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            EXCLUDED_ARCHS=x86_64

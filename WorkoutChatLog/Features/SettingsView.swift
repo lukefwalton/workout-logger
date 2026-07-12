@@ -151,7 +151,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Data")
                 } footer: {
-                    Text("**No AI in this app. No server. No account.** Your log stays on your phone. **Copy for external AI** builds a markdown summary on-device — you choose where it goes (ChatGPT, Claude, Notes, etc.). We never receive it.\n\nFull export creates a versioned JSON file for backup or portability, then iOS lets you choose the destination. Your workout database is also included in iCloud Backup automatically when that's enabled on your iPhone, so a new device restored from backup brings your history with it.")
+                    Text("**No cloud AI. No server. No account.** Your log stays on your phone. On devices with Apple Intelligence, the optional entry parser uses Apple's on-device model — your entries are never sent to us or anyone else. **Copy for external AI** builds a markdown summary on-device — you choose where it goes (ChatGPT, Claude, Notes, etc.). We never receive it.\n\nFull export creates a versioned JSON file for backup or portability, then iOS lets you choose the destination. Your workout database is also included in iCloud Backup automatically when that's enabled on your iPhone, so a new device restored from backup brings your history with it.")
                 }
 
                 Section {
@@ -388,13 +388,11 @@ struct SettingsView: View {
             // A restore can change what the widget shows (a newer last workout, a
             // newer cardio bout, or first data on a fresh install).
             WidgetRefresher.reload()
-            var parts: [String] = []
-            if summary.addedSessions > 0 || summary.addedSets > 0 {
-                parts.append("\(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets")
-            }
-            if summary.addedCardio > 0 { parts.append("\(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")") }
-            let skipped = summary.skippedSessions + summary.skippedCardio
-            let suffix = skipped > 0 ? " (\(skipped) already present)" : ""
+            // Same `addedParts` the preview showed, so completion can never
+            // contradict it (an exercise-only restore used to finish as
+            // "Nothing new to restore" because this list skipped exercises).
+            let parts = summary.addedParts
+            let suffix = summary.skippedCount > 0 ? " (\(summary.skippedCount) already present)" : ""
             // A fully-duplicate file restores nothing — say that, not "0 workouts."
             importMessage = parts.isEmpty
                 ? "Nothing new to restore\(suffix)."
@@ -405,19 +403,11 @@ struct SettingsView: View {
     }
 
     private func previewMessage(_ summary: ImportSummary) -> String {
-        let addsAnything = summary.addedSessions > 0 || summary.addedSets > 0
-            || summary.addedCardio > 0 || summary.addedExercises > 0
-        // Gate on the added counts, not `isEmpty` — a fully-duplicate backup has
+        var parts = summary.addedParts
+        // Gate on the added parts, not `isEmpty` — a fully-duplicate backup has
         // skips but adds nothing, and should read as "already present."
-        guard addsAnything else { return "This backup's data is already present — nothing to add." }
-        var parts: [String] = []
-        if summary.addedSessions > 0 || summary.addedSets > 0 {
-            parts.append("\(summary.addedSessions) workout\(summary.addedSessions == 1 ? "" : "s") and \(summary.addedSets) sets")
-        }
-        if summary.addedCardio > 0 { parts.append("\(summary.addedCardio) cardio bout\(summary.addedCardio == 1 ? "" : "s")") }
-        if summary.addedExercises > 0 { parts.append("\(summary.addedExercises) new exercise\(summary.addedExercises == 1 ? "" : "s")") }
-        let skipped = summary.skippedSessions + summary.skippedCardio
-        if skipped > 0 { parts.append("\(skipped) already present") }
+        guard !parts.isEmpty else { return "This backup's data is already present — nothing to add." }
+        if summary.skippedCount > 0 { parts.append("\(summary.skippedCount) already present") }
         return "Add " + parts.joined(separator: " · ") + "."
     }
 }

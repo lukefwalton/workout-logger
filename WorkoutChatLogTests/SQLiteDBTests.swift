@@ -203,6 +203,83 @@ final class SQLiteDBTests: XCTestCase {
         XCTAssertEqual(try exerciseCount(on: widget), 2)
     }
 
+    /// `readTransaction` is nesting-aware: called while a transaction is
+    /// already open on this connection (a wrapped store read inside `save`),
+    /// it must run the body inside the enclosing transaction instead of
+    /// issuing a second BEGIN (which SQLite rejects).
+    func testReadTransactionNestsInsideWriteTransaction() throws {
+        try db.transaction {
+            try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('bench', 'Bench', 't');")
+            // The nested read sees the enclosing transaction's uncommitted row —
+            // it is our own transaction, so that is the correct snapshot.
+            let observed = try db.readTransaction { try count("exercises") }
+            XCTAssertEqual(observed, 1)
+        }
+        XCTAssertEqual(try count("exercises"), 1)
+    }
+
+    /// The reads-only contract of `readTransaction` (and therefore of
+    /// `WorkoutStore.snapshot`, which wraps it): opening a write transaction
+    /// inside one is a caller bug and must fail with the store-specific
+    /// diagnostic — not SQLite's generic nested-transaction error — and must
+    /// leave the connection clean for the next write.
+    func testWriteTransactionInsideReadTransactionThrowsClearDiagnostic() throws {
+        XCTAssertThrowsError(try db.readTransaction {
+            try db.transaction {
+                try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('bad', 'Bad', 't');")
+            }
+        }) { error in
+            XCTAssertTrue("\(error)".contains("not allowed inside readTransaction/snapshot"),
+                          "expected the writes-inside-read diagnostic, got: \(error)")
+        }
+        // The failed snapshot rolled back; the connection is immediately writable.
+        try db.transaction {
+            try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('good', 'Good', 't');")
+        }
+        XCTAssertEqual(try count("exercises"), 1)
+    }
+
+    /// The connection lock's core guarantee: a transaction body is atomic
+    /// against concurrent readers on the SAME connection, not just each C call
+    /// (which is all FULLMUTEX gives). Writers insert exercises two-at-a-time
+    /// per transaction while readers hammer the count through
+    /// `readTransaction`; an odd count would mean a read interleaved into an
+    /// open transaction and saw half a write.
+    func testTransactionBodyIsAtomicAgainstConcurrentSameConnectionReads() throws {
+        let db = try XCTUnwrap(self.db)
+        let iterations = 50
+        let group = DispatchGroup()
+        var oddObservations = 0
+        let oddLock = NSLock()
+
+        DispatchQueue(label: "writer").async(group: group) {
+            for i in 0..<iterations {
+                try? db.transaction {
+                    try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('a\(i)', 'A\(i)', 't');")
+                    try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('b\(i)', 'B\(i)', 't');")
+                }
+            }
+        }
+        DispatchQueue(label: "reader").async(group: group) {
+            for _ in 0..<(iterations * 4) {
+                let observed = (try? db.readTransaction { () throws -> Int in
+                    let stmt = try db.prepare("SELECT COUNT(*) FROM exercises;")
+                    defer { stmt.finalize() }
+                    return try stmt.step() ? Int(stmt.int(0)) : 0
+                }) ?? 0
+                if observed % 2 != 0 {
+                    oddLock.lock(); oddObservations += 1; oddLock.unlock()
+                }
+            }
+        }
+        group.wait()
+
+        XCTAssertEqual(oddObservations, 0,
+                       "a reader observed an odd exercise count — it interleaved into an open write transaction")
+        XCTAssertEqual(try count("exercises"), iterations * 2,
+                       "every writer transaction must have committed cleanly")
+    }
+
     func testAliasCascadeDeletesWithExercise() throws {
         try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('row', 'Barbell Row', 't');")
         try db.execute("INSERT INTO exercise_aliases (alias, exercise_id) VALUES ('bb row', 1);")

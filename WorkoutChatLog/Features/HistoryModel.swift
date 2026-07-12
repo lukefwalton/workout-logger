@@ -78,10 +78,12 @@ final class HistoryModel: ObservableObject {
     }
 
     /// Reload history. The SQL + grouping pass moves off the main thread on a
-    /// `Task.detached` (SQLite is opened with FULLMUTEX, so concurrent reads are
-    /// safe); only the final state commit happens on main. Avoids the
+    /// `Task.detached`; only the final state commit happens on main. Avoids the
     /// "scrolling-frequency jank after a year of data" risk noted in the
-    /// portfolio audit. Tests can `await model.load()` to drive the same path.
+    /// portfolio audit. The three store reads run inside one `store.snapshot`
+    /// (a serialized read transaction), so a save committing mid-load can't
+    /// make the session rows, calorie spans, and cardio list disagree with
+    /// each other. Tests can `await model.load()` to drive the same path.
     ///
     /// The class is `@MainActor`, so the `state = …` assignment after the
     /// `await` resumes on the main actor — Swift Concurrency preserves the
@@ -96,32 +98,40 @@ final class HistoryModel: ObservableObject {
         do {
             let result = try await Task.detached(priority: .userInitiated) {
                 () throws -> (sections: [Section], cardio: [CardioEntry]?) in
-                let rows = try store.setHistory(since: nil, includeNotes: true)
-                let spans: [Int64: Double]
-                do {
-                    spans = try store.sessionSetSpans()
-                } catch {
-                    // A span-query failure degrades the estimate to a prompt, but
-                    // surface it in DEBUG so it stays distinguishable from
-                    // genuinely missing duration data.
-                    #if DEBUG
-                    print("[HistoryModel] sessionSetSpans failed: \(error)")
-                    #endif
-                    spans = [:]
+                // All three reads in one snapshot; the per-read degradation
+                // (spans → [:], cardio → nil) is preserved inside it.
+                let (rows, spans, cardio) = try store.snapshot {
+                    () throws -> ([WorkoutSetHistoryRow], [Int64: Double], [CardioEntry]?) in
+                    let rows = try store.setHistory(since: nil, includeNotes: true)
+                    let spans: [Int64: Double]
+                    do {
+                        spans = try store.sessionSetSpans()
+                    } catch {
+                        // A span-query failure degrades the estimate to a prompt, but
+                        // surface it in DEBUG so it stays distinguishable from
+                        // genuinely missing duration data.
+                        #if DEBUG
+                        print("[HistoryModel] sessionSetSpans failed: \(error)")
+                        #endif
+                        spans = [:]
+                    }
+                    // nil signals a cardio read failure (distinct from "no cardio"),
+                    // so the caller can surface it rather than silently show empty.
+                    let cardio: [CardioEntry]?
+                    do {
+                        cardio = try store.cardioEntries()
+                    } catch {
+                        #if DEBUG
+                        print("[HistoryModel] cardioEntries failed: \(error)")
+                        #endif
+                        cardio = nil
+                    }
+                    return (rows, spans, cardio)
                 }
+                // Grouping + calorie math is pure CPU work — done after the
+                // snapshot closes so it never holds the connection.
                 let sections = Self.computeSections(rows: rows, spans: spans,
                                                     bodyweightKg: bodyweight, policy: currentPolicy)
-                // nil signals a cardio read failure (distinct from "no cardio"),
-                // so the caller can surface it rather than silently show empty.
-                let cardio: [CardioEntry]?
-                do {
-                    cardio = try store.cardioEntries()
-                } catch {
-                    #if DEBUG
-                    print("[HistoryModel] cardioEntries failed: \(error)")
-                    #endif
-                    cardio = nil
-                }
                 return (sections, cardio)
             }.value
             // A newer `load()` has run since this one started — drop the stale

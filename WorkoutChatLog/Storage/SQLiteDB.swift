@@ -10,11 +10,15 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 /// bundles. Deliberately small: it knows about statements and transactions, not
 /// about workouts. The domain SQL lives in `WorkoutStore`.
 ///
-/// `@unchecked Sendable` is safe here because the connection is opened with
-/// `SQLITE_OPEN_FULLMUTEX` (see `init(path:)`), which makes the underlying
-/// SQLite handle thread-safe — concurrent reads/writes are serialized by SQLite
-/// itself. This lets non-mutating reads (`WorkoutStore.setHistory`,
-/// `sessionSetSpans`, …) run off the main thread without main-actor pinning.
+/// `@unchecked Sendable` rests on two layers. `SQLITE_OPEN_FULLMUTEX` (see
+/// `init(path:)`) makes each individual C call thread-safe, but it does NOT
+/// make a multi-statement Swift closure atomic: another thread's statement
+/// could run between BEGIN and COMMIT on the same connection and observe (or
+/// join) the half-applied transaction. So on top of the mutex, a recursive
+/// `connectionLock` serializes `transaction` and `readTransaction` closures —
+/// while any transaction is open on this connection, no other thread can run
+/// one. Off-main reads (`WorkoutStore.setHistory`, `sessionSetSpans`, …) stay
+/// legal; they go through `readTransaction` and simply wait their turn.
 final class SQLiteDB: @unchecked Sendable {
     enum DBError: Error, CustomStringConvertible {
         case open(String)
@@ -33,6 +37,19 @@ final class SQLiteDB: @unchecked Sendable {
     }
 
     private let handle: OpaquePointer
+
+    /// Serializes whole transaction closures (not just single C calls) on this
+    /// connection. Recursive because store reads compose: a read wrapped in
+    /// `readTransaction` may be called from inside an open `transaction` body
+    /// on the same thread (e.g. `resolveExercise` inside `save`).
+    private let connectionLock = NSRecursiveLock()
+
+    /// True while a top-level `readTransaction` snapshot is open. Only ever
+    /// read or written under `connectionLock`, so inside `prepare` a true
+    /// value can only mean the CURRENT thread's snapshot (any other thread
+    /// would still be blocked on the lock) — which makes the reads-only check
+    /// below race-free without thread bookkeeping.
+    private var inReadTransaction = false
 
     /// Opens (creating if needed) the database at `path`. Pass ":memory:" for an
     /// ephemeral DB.
@@ -67,9 +84,23 @@ final class SQLiteDB: @unchecked Sendable {
     }
 
     func prepare(_ sql: String) throws -> Statement {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
             throw DBError.prepare(lastErrorMessage())
+        }
+        // The reads-only snapshot contract, enforced at the statement level:
+        // the nested-BEGIN diagnostic in `transaction` catches writes that go
+        // through the write path, but a raw INSERT/UPDATE/DELETE prepared
+        // directly inside a snapshot would silently upgrade the deferred
+        // transaction instead. `sqlite3_stmt_readonly` knows exactly which
+        // statements write, so those are refused here before they can run.
+        if inReadTransaction, sqlite3_stmt_readonly(stmt) == 0 {
+            sqlite3_finalize(stmt)
+            throw DBError.prepare("""
+                write statement prepared inside readTransaction/snapshot — snapshots are reads-only
+                """)
         }
         return Statement(stmt: stmt, db: handle)
     }
@@ -87,6 +118,20 @@ final class SQLiteDB: @unchecked Sendable {
     /// lock, subsequent writes can't be starved.
     @discardableResult
     func transaction<T>(_ body: () throws -> T) throws -> T {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
+        // Catch misuse with a precise diagnostic before the generic BEGIN
+        // failure: we hold the recursive lock, so an already-open transaction
+        // here can only be our own thread's — either a write attempted inside
+        // `readTransaction`/`WorkoutStore.snapshot` (reads-only by contract),
+        // or a nested `transaction` (they don't nest; the import path inserts
+        // raw rows for exactly this reason — learnings/027).
+        guard sqlite3_get_autocommit(handle) != 0 else {
+            throw DBError.exec("""
+                write transaction opened inside an open transaction — writes are \
+                not allowed inside readTransaction/snapshot, and transactions do not nest
+                """)
+        }
         try execute("BEGIN IMMEDIATE;")
         do {
             let result = try body()
@@ -99,15 +144,28 @@ final class SQLiteDB: @unchecked Sendable {
     }
 
     /// Read-only transaction (BEGIN DEFERRED -> body -> COMMIT). Used by
-    /// read-only clients (notably the Home Screen widget) that span multiple
-    /// SELECTs and need a consistent snapshot — without it, a writer can
-    /// commit between the two queries and the second SELECT can see a
-    /// different state. Cannot be used for writes (the deferred transaction
-    /// would upgrade to a write lock on the first write and is the variant
-    /// the main `transaction` helper warns about).
+    /// read-only clients (the Home Screen widget, and every `WorkoutStore`
+    /// read) that need a consistent snapshot — without it, a writer can
+    /// commit between two queries and the second SELECT can see a different
+    /// state, and on *this* connection a bare read could even land inside
+    /// another thread's open write transaction and see half a workout.
+    /// Cannot be used for writes (the deferred transaction would upgrade to a
+    /// write lock on the first write and is the variant the main `transaction`
+    /// helper warns about).
+    ///
+    /// Nesting-aware: when a transaction is already open on this connection
+    /// (we hold the recursive lock, so it can only be our own thread's — e.g.
+    /// a wrapped read helper called from inside `save`), the enclosing
+    /// transaction is already the snapshot boundary and the body just runs;
+    /// issuing a second BEGIN would be an error.
     @discardableResult
     func readTransaction<T>(_ body: () throws -> T) throws -> T {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
+        guard sqlite3_get_autocommit(handle) != 0 else { return try body() }
         try execute("BEGIN DEFERRED;")
+        inReadTransaction = true
+        defer { inReadTransaction = false }
         do {
             let result = try body()
             try execute("COMMIT;")

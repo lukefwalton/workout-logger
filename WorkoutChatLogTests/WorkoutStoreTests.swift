@@ -806,7 +806,66 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertNil(row.sessionEndedAt)
     }
 
+    // MARK: - Snapshot consistency (store altitude)
+
+    /// The `snapshot` contract proven at the store's own altitude, mirroring
+    /// the connection-level hammer in SQLiteDBTests: while the main actor
+    /// saves two-set drafts, a background reader inside one `store.snapshot`
+    /// must never observe half a save — neither an odd set count nor two
+    /// reads of the same table that disagree with each other.
+    func testSnapshotNeverObservesHalfASave() throws {
+        try seed()
+        let store = try XCTUnwrap(self.store)
+        let group = DispatchGroup()
+        var inconsistencies = 0
+        let lock = NSLock()
+
+        DispatchQueue(label: "snapshot-reader").async(group: group) {
+            for _ in 0..<200 {
+                let observed = (try? store.snapshot { () throws -> (Int, Int) in
+                    (try store.setCount(), try store.setCount())
+                }) ?? (0, 0)
+                if observed.0 % 2 != 0 || observed.0 != observed.1 {
+                    lock.lock(); inconsistencies += 1; lock.unlock()
+                }
+            }
+        }
+
+        for _ in 0..<40 {
+            try store.save(WorkoutDraft(startedAt: Date(), name: nil, notes: nil, sets: [
+                makeSet("Bench Press"), makeSet("Squat")
+            ]))
+        }
+
+        group.wait()
+        XCTAssertEqual(inconsistencies, 0,
+                       "a snapshot observed a torn save (odd set count, or two reads disagreeing)")
+        XCTAssertEqual(try store.setCount(), 80, "every save must have committed cleanly")
+    }
+
+    /// The snapshot reads-only contract at store altitude, including the
+    /// Storage-internal escape route: a RAW writer (`insertExercise`, which
+    /// bypasses `db.transaction` because it runs inside the save/import
+    /// transactions) must also be rejected inside a snapshot — statement-level
+    /// enforcement via `sqlite3_stmt_readonly`, not just the nested-BEGIN
+    /// diagnostic. The snapshot rolls back and the connection stays writable.
+    func testRawStorageWriteInsideSnapshotIsRejected() throws {
+        XCTAssertThrowsError(try store.snapshot {
+            try store.insertExercise(slug: "sneaky", canonicalName: "Sneaky", familyKey: nil,
+                                     primaryMuscle: nil, secondaryMuscles: [], isCustom: true)
+        }) { error in
+            XCTAssertTrue("\(error)".contains("snapshots are reads-only"),
+                          "expected the reads-only diagnostic, got: \(error)")
+        }
+        XCTAssertNil(try store.resolveExercise("Sneaky"), "the rejected write must not have landed")
+        // The failed snapshot rolled back cleanly; normal writes still work.
+        _ = try store.addExercise(named: "Legit")
+        XCTAssertNotNil(try store.resolveExercise("Legit"))
+    }
+
     // Transaction rollback and FK-cascade behavior are exercised directly
-    // against SQLiteDB + Schema in SQLiteDBTests, now that WorkoutStore.db is
-    // private.
+    // against SQLiteDB + Schema in SQLiteDBTests, at the connection's own
+    // altitude. (Feature code still can't casually reach WorkoutStore.db —
+    // the file split made it internal, and scripts/check_store_boundary.sh
+    // polices the boundary in CI.)
 }
