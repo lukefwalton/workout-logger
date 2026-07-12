@@ -9,10 +9,15 @@
 # Companion to check_appgroup_sync.sh; runs in checks.yml on every PR.
 #
 # The guarded surface below is the COMPLETE write-capable set: the other
-# cross-file internal members on WorkoutStore (`count`, `snapshot`,
+# cross-file internal members on WorkoutStore (`count(inTable:)`, `snapshot`,
 # `exerciseID(slug:)`, `aliasesByExercise`, the ISO/date statics) are
-# read-only or pure and deliberately not guarded. If a future split widens
-# another write helper to internal, add it here in the same change.
+# read-only BY CONSTRUCTION, not merely by convention — in particular
+# `count(inTable:)` takes a validated bare table identifier and builds its
+# SELECT internally, precisely so it cannot serve as an ad hoc SQL entry
+# point (an earlier draft took raw SQL text; a review caught it). If a future
+# split widens another helper that accepts SQL text or can write, either
+# constrain its signature the same way or add it to WRITE_SURFACE in the
+# same change, with a self-test fixture.
 #
 # Rules, over production sources only (tests use @testable deliberately):
 #   1. Outside WorkoutChatLog/Storage/, no reference to the store-internal
@@ -33,8 +38,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # `\.db\b` catches any `<store>.db` access regardless of the variable name;
-# the write helpers are matched by name (call or reference).
-WRITE_SURFACE='resolveOrCreateExercise|insertExercise[( ]|insertAlias[( ]|\.db\b'
+# the write helpers are matched as whole words so both calls and bare method
+# references (`let f = store.insertExercise`) trip the guard.
+WRITE_SURFACE='\bresolveOrCreateExercise\b|\binsertExercise\b|\binsertAlias\b|\.db\b'
 
 # Check one tree. Prints violations; returns 0 clean, 1 violated, 2 unusable.
 check_tree() {
@@ -111,13 +117,15 @@ self_test() {
     "WorkoutChatLog/Features/Bad.swift" '_ = try store.resolveOrCreateExercise(name)'
   expect 1 "insertAlias is caught" \
     "WorkoutChatLog/Features/Bad.swift" 'try store.insertAlias(a, exerciseID: id)'
+  expect 1 "bare method reference (no call parens) is caught" \
+    "WorkoutChatLog/Features/Bad.swift" 'let f = store.insertExercise'
   expect 1 "SQLiteDB construction in Features is caught" \
     "WorkoutChatLog/Features/Bad.swift" 'let db = try SQLiteDB(path: p)'
   expect 1 "SQLiteDB construction in the widget target is caught" \
     "WorkoutWidget/Bad.swift" 'let db = try SQLiteDB(path: p)'
   expect 0 "Shared may construct its read-only SQLiteDB" \
     "WorkoutChatLog/Shared/Reader.swift" 'let db = try SQLiteDB(path: url.path)'
-  echo "✅ Guard self-test passed (7 fixtures)"
+  echo "✅ Guard self-test passed (8 fixtures)"
 }
 
 self_test

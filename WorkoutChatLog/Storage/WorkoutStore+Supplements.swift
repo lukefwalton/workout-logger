@@ -18,7 +18,7 @@ extension WorkoutStore {
     @MainActor
     func seedSupplementsIfNeeded() throws {
         try db.transaction {
-            guard try count("SELECT COUNT(*) FROM supplements;") == 0 else { return }
+            guard try count(inTable: "supplements") == 0 else { return }
             for (index, preset) in Self.presetSupplements.enumerated() {
                 try insertSupplementRow(name: preset.name, isPreset: true,
                                         tracksGrams: preset.tracksGrams, sortOrder: index)

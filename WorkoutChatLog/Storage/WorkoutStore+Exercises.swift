@@ -295,7 +295,7 @@ extension WorkoutStore {
 
     // MARK: - Reads
 
-    func exerciseCount() throws -> Int { try count("SELECT COUNT(*) FROM exercises;") }
+    func exerciseCount() throws -> Int { try count(inTable: "exercises") }
 
     /// Canonical display names for the FM layer's prompt (PR 8), most-used first so
     /// the `limit` keeps the lifts the user actually logs. A non-isolated read — it

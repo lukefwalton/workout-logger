@@ -64,7 +64,7 @@ extension WorkoutStore {
         }
     }
 
-    func cardioCount() throws -> Int { try count("SELECT COUNT(*) FROM cardio_entries;") }
+    func cardioCount() throws -> Int { try count(inTable: "cardio_entries") }
 
     /// Delete one cardio bout (History swipe-to-delete).
     @MainActor

@@ -6,8 +6,8 @@ import Foundation
 extension WorkoutStore {
     // MARK: - Reads (UI counts, the future audit view, and tests)
 
-    func sessionCount() throws -> Int { try count("SELECT COUNT(*) FROM workout_sessions;") }
-    func setCount() throws -> Int { try count("SELECT COUNT(*) FROM sets;") }
+    func sessionCount() throws -> Int { try count(inTable: "workout_sessions") }
+    func setCount() throws -> Int { try count(inTable: "sets") }
 
     func setCount(inSession id: Int64) throws -> Int {
         try db.readTransaction {

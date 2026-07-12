@@ -64,10 +64,18 @@ final class WorkoutStore: @unchecked Sendable {
         try db.readTransaction(body)
     }
 
-    /// Single-value COUNT helper shared by the domain files.
-    func count(_ sql: String) throws -> Int {
-        try db.readTransaction {
-            let stmt = try db.prepare(sql)
+    /// Row count for one of the store's own tables, shared by the domain
+    /// files. Deliberately takes a bare table identifier rather than SQL text
+    /// and builds the statement here: an earlier draft took a raw SQL string,
+    /// which — being cross-file `internal` — was an ad hoc SQL escape hatch
+    /// around the store's boundary ("feature code never runs SQL"). The
+    /// identifier is validated so it can't smuggle a clause, and the built
+    /// statement is a SELECT, so this helper can never write.
+    func count(inTable table: String) throws -> Int {
+        precondition(table.allSatisfy { $0.isLetter || $0 == "_" },
+                     "count(inTable:) takes a bare table identifier, never SQL")
+        return try db.readTransaction {
+            let stmt = try db.prepare("SELECT COUNT(*) FROM \(table);")
             defer { stmt.finalize() }
             return try stmt.step() ? Int(stmt.int(0)) : 0
         }
