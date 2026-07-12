@@ -245,7 +245,8 @@ extension WorkoutStore {
     /// `exercises` row only ever happens inside the save/updateSet transactions
     /// (`WorkoutStore+Sessions.swift`), so the single write path stays enforced
     /// by the store rather than by feature-code convention. The future editable-
-    /// registry surface will be the one other, intentional writer.
+    /// registry surface will be the one other, intentional writer. Part of the
+    /// guarded surface policed by `scripts/check_store_boundary.sh`.
     @discardableResult
     func resolveOrCreateExercise(_ rawName: String) throws -> Int64 {
         if let id = try resolveExercise(rawName) { return id }
@@ -353,7 +354,9 @@ extension WorkoutStore {
         }
     }
 
-    // MARK: - Row-level writes (store-internal; the import path also inserts registry rows)
+    // MARK: - Row-level writes (store-internal; the import path also inserts registry rows.
+    // Internal only for the cross-file transactions — part of the guarded surface that
+    // scripts/check_store_boundary.sh keeps out of feature code.)
 
     @discardableResult
     func insertExercise(slug: String, canonicalName: String, familyKey: String?,

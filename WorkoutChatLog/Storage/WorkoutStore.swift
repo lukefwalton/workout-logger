@@ -31,7 +31,9 @@ final class WorkoutStore: @unchecked Sendable {
     /// The one connection. Internal rather than `private` only because Swift's
     /// `private` is file-scoped and the domain extension files above need it.
     /// It is still store-internal by contract: feature code goes through the
-    /// typed API, so every workout write funnels into `save`.
+    /// typed API, so every workout write funnels into `save`. Part of the
+    /// guarded surface — `scripts/check_store_boundary.sh` fails CI on any
+    /// reference outside `WorkoutChatLog/Storage/`.
     let db: SQLiteDB
 
     init(db: SQLiteDB) {
