@@ -47,9 +47,12 @@ final class WorkoutStore: @unchecked Sendable {
 
     /// The applied schema version. Exposed for diagnostics/tests; the raw
     /// connection stays store-internal so feature code can't run ad hoc SQL and
-    /// bypass validation — every workout write goes through `save`.
+    /// bypass validation — every workout write goes through `save`. Wrapped in
+    /// `readTransaction` like every other store read — a lone PRAGMA would be
+    /// harmless mid-transaction, but the serialized-read rule is only useful
+    /// if it has no exceptions.
     func schemaVersion() throws -> Int {
-        try db.userVersion()
+        try db.readTransaction { try db.userVersion() }
     }
 
     // MARK: - Shared plumbing (used by the domain extension files)
