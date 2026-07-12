@@ -44,6 +44,13 @@ final class SQLiteDB: @unchecked Sendable {
     /// on the same thread (e.g. `resolveExercise` inside `save`).
     private let connectionLock = NSRecursiveLock()
 
+    /// True while a top-level `readTransaction` snapshot is open. Only ever
+    /// read or written under `connectionLock`, so inside `prepare` a true
+    /// value can only mean the CURRENT thread's snapshot (any other thread
+    /// would still be blocked on the lock) — which makes the reads-only check
+    /// below race-free without thread bookkeeping.
+    private var inReadTransaction = false
+
     /// Opens (creating if needed) the database at `path`. Pass ":memory:" for an
     /// ephemeral DB.
     init(path: String) throws {
@@ -77,9 +84,23 @@ final class SQLiteDB: @unchecked Sendable {
     }
 
     func prepare(_ sql: String) throws -> Statement {
+        connectionLock.lock()
+        defer { connectionLock.unlock() }
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {
             throw DBError.prepare(lastErrorMessage())
+        }
+        // The reads-only snapshot contract, enforced at the statement level:
+        // the nested-BEGIN diagnostic in `transaction` catches writes that go
+        // through the write path, but a raw INSERT/UPDATE/DELETE prepared
+        // directly inside a snapshot would silently upgrade the deferred
+        // transaction instead. `sqlite3_stmt_readonly` knows exactly which
+        // statements write, so those are refused here before they can run.
+        if inReadTransaction, sqlite3_stmt_readonly(stmt) == 0 {
+            sqlite3_finalize(stmt)
+            throw DBError.prepare("""
+                write statement prepared inside readTransaction/snapshot — snapshots are reads-only
+                """)
         }
         return Statement(stmt: stmt, db: handle)
     }
@@ -143,6 +164,8 @@ final class SQLiteDB: @unchecked Sendable {
         defer { connectionLock.unlock() }
         guard sqlite3_get_autocommit(handle) != 0 else { return try body() }
         try execute("BEGIN DEFERRED;")
+        inReadTransaction = true
+        defer { inReadTransaction = false }
         do {
             let result = try body()
             try execute("COMMIT;")

@@ -843,6 +843,26 @@ final class WorkoutStoreTests: XCTestCase {
         XCTAssertEqual(try store.setCount(), 80, "every save must have committed cleanly")
     }
 
+    /// The snapshot reads-only contract at store altitude, including the
+    /// Storage-internal escape route: a RAW writer (`insertExercise`, which
+    /// bypasses `db.transaction` because it runs inside the save/import
+    /// transactions) must also be rejected inside a snapshot — statement-level
+    /// enforcement via `sqlite3_stmt_readonly`, not just the nested-BEGIN
+    /// diagnostic. The snapshot rolls back and the connection stays writable.
+    func testRawStorageWriteInsideSnapshotIsRejected() throws {
+        XCTAssertThrowsError(try store.snapshot {
+            try store.insertExercise(slug: "sneaky", canonicalName: "Sneaky", familyKey: nil,
+                                     primaryMuscle: nil, secondaryMuscles: [], isCustom: true)
+        }) { error in
+            XCTAssertTrue("\(error)".contains("snapshots are reads-only"),
+                          "expected the reads-only diagnostic, got: \(error)")
+        }
+        XCTAssertNil(try store.resolveExercise("Sneaky"), "the rejected write must not have landed")
+        // The failed snapshot rolled back cleanly; normal writes still work.
+        _ = try store.addExercise(named: "Legit")
+        XCTAssertNotNil(try store.resolveExercise("Legit"))
+    }
+
     // Transaction rollback and FK-cascade behavior are exercised directly
     // against SQLiteDB + Schema in SQLiteDBTests, at the connection's own
     // altitude. (Feature code still can't casually reach WorkoutStore.db —
