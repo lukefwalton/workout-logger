@@ -2,9 +2,12 @@ name: Checks
 
 # Config guardrails that don't need Xcode. Validates that the App Group
 # identifier in project.yml matches the constant in
-# Shared/SharedDatabase.swift, so the app and the Home Screen widget can never
-# drift onto two different on-device databases. Companion to ios-tests.yml,
-# which handles the actual iOS build/test.
+# Shared/SharedDatabase.swift (so the app and the Home Screen widget can never
+# drift onto two different on-device databases), and that the store's
+# write-path boundary holds now that WorkoutStore spans multiple files (its
+# raw connection and registry writers are internal, so the compiler no longer
+# polices feature-code access — check_store_boundary.sh does). Companion to
+# ios-tests.yml, which handles the actual iOS build/test.
 
 on:
   pull_request:
@@ -21,3 +24,5 @@ jobs:
         run: bash scripts/check_designsystem_sync.sh
       - name: App Group identifier sync (project.yml ↔ Swift)
         run: bash scripts/check_appgroup_sync.sh
+      - name: Store write-path boundary (raw db + registry writers stay in Storage/)
+        run: bash scripts/check_store_boundary.sh
