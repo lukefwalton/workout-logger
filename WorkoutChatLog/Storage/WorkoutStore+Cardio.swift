@@ -39,27 +39,29 @@ extension WorkoutStore {
     /// read so History can fetch off the main thread like `setHistory`.
     func cardioEntries(since: Date? = nil) throws -> [CardioEntry] {
         let start = since.map(Self.iso)
-        let stmt = try db.prepare("""
-            SELECT id, activity, duration_seconds, distance, distance_unit, notes, source_text, logged_at
-            FROM cardio_entries
-            WHERE (? IS NULL OR logged_at >= ?)
-            ORDER BY logged_at DESC, id DESC;
-        """)
-        defer { stmt.finalize() }
-        stmt.bind(optionalText: start, at: 1)
-        stmt.bind(optionalText: start, at: 2)
-        var rows: [CardioEntry] = []
-        while try stmt.step() {
-            rows.append(CardioEntry(id: stmt.int(0),
-                                    activity: stmt.text(1) ?? CardioActivity.generic.display,
-                                    durationSeconds: stmt.optionalInt(2),
-                                    distance: stmt.optionalDouble(3),
-                                    distanceUnit: stmt.text(4).flatMap(CardioDistanceUnit.init(rawValue:)),
-                                    notes: stmt.text(5),
-                                    sourceText: stmt.text(6),
-                                    loggedAt: Self.date(stmt.text(7)) ?? Date()))
+        return try db.readTransaction {
+            let stmt = try db.prepare("""
+                SELECT id, activity, duration_seconds, distance, distance_unit, notes, source_text, logged_at
+                FROM cardio_entries
+                WHERE (? IS NULL OR logged_at >= ?)
+                ORDER BY logged_at DESC, id DESC;
+            """)
+            defer { stmt.finalize() }
+            stmt.bind(optionalText: start, at: 1)
+            stmt.bind(optionalText: start, at: 2)
+            var rows: [CardioEntry] = []
+            while try stmt.step() {
+                rows.append(CardioEntry(id: stmt.int(0),
+                                        activity: stmt.text(1) ?? CardioActivity.generic.display,
+                                        durationSeconds: stmt.optionalInt(2),
+                                        distance: stmt.optionalDouble(3),
+                                        distanceUnit: stmt.text(4).flatMap(CardioDistanceUnit.init(rawValue:)),
+                                        notes: stmt.text(5),
+                                        sourceText: stmt.text(6),
+                                        loggedAt: Self.date(stmt.text(7)) ?? Date()))
+            }
+            return rows
         }
-        return rows
     }
 
     func cardioCount() throws -> Int { try count("SELECT COUNT(*) FROM cardio_entries;") }

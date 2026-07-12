@@ -141,4 +141,32 @@ final class WorkoutExportModelsTests: XCTestCase {
         XCTAssertNil(session.feel)
         XCTAssertTrue(session.sets.isEmpty)
     }
+
+    /// The restore-copy contract: preview and completion both compose from
+    /// `addedParts`, so an exercise-only restore must surface as an add — the
+    /// shipped bug was a completion formatter that skipped `addedExercises`
+    /// and finished with "Nothing new to restore" after changing the library.
+    func testAddedPartsIncludesExerciseOnlyRestore() {
+        var summary = ImportSummary()
+        summary.addedExercises = 3
+        XCTAssertEqual(summary.addedParts, ["3 new exercises"])
+
+        summary.addedExercises = 1
+        XCTAssertEqual(summary.addedParts, ["1 new exercise"])
+    }
+
+    func testAddedPartsCoversAllDomainsAndSkippedCountAggregates() {
+        var summary = ImportSummary()
+        summary.addedSessions = 2
+        summary.addedSets = 6
+        summary.addedCardio = 1
+        summary.addedExercises = 1
+        summary.skippedSessions = 3
+        summary.skippedCardio = 2
+        XCTAssertEqual(summary.addedParts,
+                       ["2 workouts and 6 sets", "1 cardio bout", "1 new exercise"])
+        XCTAssertEqual(summary.skippedCount, 5)
+        XCTAssertTrue(ImportSummary().addedParts.isEmpty,
+                      "an all-duplicate restore adds nothing and must read that way")
+    }
 }

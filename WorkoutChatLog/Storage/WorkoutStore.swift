@@ -18,10 +18,15 @@ import Foundation
 /// session, registry resolution inside the save transaction) remain enforced
 /// in one place; the split is file organization, not a change of ownership.
 ///
-/// `@unchecked Sendable` is sound because the only stored property is the
-/// thread-safe `SQLiteDB` (FULLMUTEX) and write APIs are `@MainActor`-gated.
-/// This unlocks off-main History/Progress reads — `setHistory` is a hot,
-/// scrolling-frequency call after a year of data.
+/// `@unchecked Sendable` is sound because the only stored property is
+/// `SQLiteDB`, which serializes whole transaction closures on a recursive
+/// connection lock (FULLMUTEX alone only covers single C calls — see
+/// `SQLiteDB`'s doc). Writes are additionally `@MainActor`-gated; reads go
+/// through `db.readTransaction`, so an off-main read can never interleave
+/// into an open write transaction or see half a workout. This keeps off-main
+/// History/Progress reads legal — `setHistory` is a hot, scrolling-frequency
+/// call after a year of data. Multi-read consumers get consistency via
+/// `snapshot(_:)`.
 final class WorkoutStore: @unchecked Sendable {
     /// The one connection. Internal rather than `private` only because Swift's
     /// `private` is file-scoped and the domain extension files above need it.
@@ -47,11 +52,23 @@ final class WorkoutStore: @unchecked Sendable {
 
     // MARK: - Shared plumbing (used by the domain extension files)
 
+    /// Run several reads as one consistent snapshot: a single deferred read
+    /// transaction, serialized against writes on this connection, so a save
+    /// committing mid-snapshot can't make two reads disagree (e.g. History's
+    /// session rows vs. its cardio list). Nests harmlessly around the store's
+    /// individually-wrapped reads. Read-only by contract — writes belong in
+    /// the domain APIs, which own their own transactions.
+    func snapshot<T>(_ body: () throws -> T) throws -> T {
+        try db.readTransaction(body)
+    }
+
     /// Single-value COUNT helper shared by the domain files.
     func count(_ sql: String) throws -> Int {
-        let stmt = try db.prepare(sql)
-        defer { stmt.finalize() }
-        return try stmt.step() ? Int(stmt.int(0)) : 0
+        try db.readTransaction {
+            let stmt = try db.prepare(sql)
+            defer { stmt.finalize() }
+            return try stmt.step() ? Int(stmt.int(0)) : 0
+        }
     }
 
     // MARK: - Encoding helpers

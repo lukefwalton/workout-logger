@@ -67,6 +67,24 @@ struct ImportSummary: Equatable {
         addedSessions == 0 && addedExercises == 0 && skippedSessions == 0
             && addedCardio == 0 && skippedCardio == 0
     }
+
+    /// The user-facing fragments for everything added (or, on a dry run, to be
+    /// added) — the ONE list both the pre-import preview and the completion
+    /// message compose from. Keeping them on the summary means the two surfaces
+    /// can never disagree about what counts as "something new": the shipped bug
+    /// was a completion message that ignored `addedExercises`, so an
+    /// exercise-only restore finished as "Nothing new to restore."
+    var addedParts: [String] {
+        var parts: [String] = []
+        if addedSessions > 0 || addedSets > 0 {
+            parts.append("\(addedSessions) workout\(addedSessions == 1 ? "" : "s") and \(addedSets) sets")
+        }
+        if addedCardio > 0 { parts.append("\(addedCardio) cardio bout\(addedCardio == 1 ? "" : "s")") }
+        if addedExercises > 0 { parts.append("\(addedExercises) new exercise\(addedExercises == 1 ? "" : "s")") }
+        return parts
+    }
+
+    var skippedCount: Int { skippedSessions + skippedCardio }
 }
 
 struct ExportedAnalyticsPolicy: Codable, Equatable {

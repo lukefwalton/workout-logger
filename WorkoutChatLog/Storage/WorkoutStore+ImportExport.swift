@@ -8,19 +8,23 @@ extension WorkoutStore {
     // MARK: - Export
 
     func dataExport(includeNotes: Bool = true, exportedAt: Date = Date()) throws -> WorkoutDataExport {
-        let rows = try exportRows(includeNotes: includeNotes)
-        var sessions = try exportSessions(includeNotes: includeNotes)
-        for index in sessions.indices {
-            sessions[index].sets = rows.filter { $0.sessionID == sessions[index].id }.map(\.set)
-        }
+        // One read transaction around all four table reads, so a save landing
+        // mid-export can't produce a file whose sets disagree with its sessions.
+        try db.readTransaction {
+            let rows = try exportRows(includeNotes: includeNotes)
+            var sessions = try exportSessions(includeNotes: includeNotes)
+            for index in sessions.indices {
+                sessions[index].sets = rows.filter { $0.sessionID == sessions[index].id }.map(\.set)
+            }
 
-        return WorkoutDataExport(schemaVersion: 3,   // 3: adds cardio_entries (2: sessions carry ended_at / feel / is_deload)
-                                 exportedAt: Self.iso(exportedAt),
-                                 app: "WorkoutChatLog",
-                                 analyticsPolicy: ExportedAnalyticsPolicy(.default),
-                                 exercises: try exportExercises(),
-                                 sessions: sessions,
-                                 cardio: try exportCardio(includeNotes: includeNotes))
+            return WorkoutDataExport(schemaVersion: 3,   // 3: adds cardio_entries (2: sessions carry ended_at / feel / is_deload)
+                                     exportedAt: Self.iso(exportedAt),
+                                     app: "WorkoutChatLog",
+                                     analyticsPolicy: ExportedAnalyticsPolicy(.default),
+                                     exercises: try exportExercises(),
+                                     sessions: sessions,
+                                     cardio: try exportCardio(includeNotes: includeNotes))
+        }
     }
 
     func writeDataExport(includeNotes: Bool = true) throws -> URL {

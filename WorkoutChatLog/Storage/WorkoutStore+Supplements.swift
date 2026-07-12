@@ -28,49 +28,55 @@ extension WorkoutStore {
 
     /// The configured supplements, presets first. Non-isolated read.
     func supplements() throws -> [Supplement] {
-        let stmt = try db.prepare("""
-            SELECT id, name, is_preset, tracks_grams, sort_order
-            FROM supplements ORDER BY sort_order ASC, id ASC;
-        """)
-        defer { stmt.finalize() }
-        var out: [Supplement] = []
-        while try stmt.step() {
-            out.append(Supplement(id: stmt.int(0),
-                                  name: stmt.text(1) ?? "",
-                                  isPreset: stmt.int(2) == 1,
-                                  tracksGrams: stmt.int(3) == 1,
-                                  sortOrder: Int(stmt.int(4))))
+        try db.readTransaction {
+            let stmt = try db.prepare("""
+                SELECT id, name, is_preset, tracks_grams, sort_order
+                FROM supplements ORDER BY sort_order ASC, id ASC;
+            """)
+            defer { stmt.finalize() }
+            var out: [Supplement] = []
+            while try stmt.step() {
+                out.append(Supplement(id: stmt.int(0),
+                                      name: stmt.text(1) ?? "",
+                                      isPreset: stmt.int(2) == 1,
+                                      tracksGrams: stmt.int(3) == 1,
+                                      sortOrder: Int(stmt.int(4))))
+            }
+            return out
         }
-        return out
     }
 
     /// One day's intake keyed by supplement id (presence = taken). Non-isolated.
     func supplementIntake(onDay day: String) throws -> [Int64: SupplementIntake] {
-        let stmt = try db.prepare("SELECT supplement_id, day, grams FROM supplement_intake WHERE day = ?;")
-        defer { stmt.finalize() }
-        stmt.bind(text: day, at: 1)
-        var out: [Int64: SupplementIntake] = [:]
-        while try stmt.step() {
-            let sid = stmt.int(0)
-            out[sid] = SupplementIntake(supplementID: sid, day: stmt.text(1) ?? day, grams: stmt.optionalDouble(2))
+        try db.readTransaction {
+            let stmt = try db.prepare("SELECT supplement_id, day, grams FROM supplement_intake WHERE day = ?;")
+            defer { stmt.finalize() }
+            stmt.bind(text: day, at: 1)
+            var out: [Int64: SupplementIntake] = [:]
+            while try stmt.step() {
+                let sid = stmt.int(0)
+                out[sid] = SupplementIntake(supplementID: sid, day: stmt.text(1) ?? day, grams: stmt.optionalDouble(2))
+            }
+            return out
         }
-        return out
     }
 
     /// All intake on/after `sinceDay` ('YYYY-MM-DD'), oldest first — the raw history
     /// the trends analytics aggregates. Non-isolated read.
     func supplementHistory(sinceDay: String) throws -> [SupplementIntake] {
-        let stmt = try db.prepare("""
-            SELECT supplement_id, day, grams FROM supplement_intake
-            WHERE day >= ? ORDER BY day ASC, supplement_id ASC;
-        """)
-        defer { stmt.finalize() }
-        stmt.bind(text: sinceDay, at: 1)
-        var out: [SupplementIntake] = []
-        while try stmt.step() {
-            out.append(SupplementIntake(supplementID: stmt.int(0), day: stmt.text(1) ?? "", grams: stmt.optionalDouble(2)))
+        try db.readTransaction {
+            let stmt = try db.prepare("""
+                SELECT supplement_id, day, grams FROM supplement_intake
+                WHERE day >= ? ORDER BY day ASC, supplement_id ASC;
+            """)
+            defer { stmt.finalize() }
+            stmt.bind(text: sinceDay, at: 1)
+            var out: [SupplementIntake] = []
+            while try stmt.step() {
+                out.append(SupplementIntake(supplementID: stmt.int(0), day: stmt.text(1) ?? "", grams: stmt.optionalDouble(2)))
+            }
+            return out
         }
-        return out
     }
 
     /// Add a custom supplement (always a checkbox; grams stays a Protein thing for

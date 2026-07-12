@@ -60,23 +60,25 @@ extension WorkoutStore {
 
     /// Library entries with usage counts, for Settings → Exercises.
     func managedExercises() throws -> [ManagedExercise] {
-        let stmt = try db.prepare("""
-            SELECT e.id, e.canonical_name, e.family_key, e.primary_muscle, e.is_custom,
-                   (SELECT COUNT(*) FROM sets WHERE exercise_id = e.id)
-            FROM exercises e
-            ORDER BY e.canonical_name COLLATE NOCASE;
-        """)
-        defer { stmt.finalize() }
-        var rows: [ManagedExercise] = []
-        while try stmt.step() {
-            rows.append(ManagedExercise(id: stmt.int(0),
-                                        canonicalName: stmt.text(1) ?? "",
-                                        familyKey: stmt.text(2),
-                                        primaryMuscle: stmt.text(3),
-                                        isCustom: stmt.int(4) != 0,
-                                        usageCount: Int(stmt.int(5))))
+        try db.readTransaction {
+            let stmt = try db.prepare("""
+                SELECT e.id, e.canonical_name, e.family_key, e.primary_muscle, e.is_custom,
+                       (SELECT COUNT(*) FROM sets WHERE exercise_id = e.id)
+                FROM exercises e
+                ORDER BY e.canonical_name COLLATE NOCASE;
+            """)
+            defer { stmt.finalize() }
+            var rows: [ManagedExercise] = []
+            while try stmt.step() {
+                rows.append(ManagedExercise(id: stmt.int(0),
+                                            canonicalName: stmt.text(1) ?? "",
+                                            familyKey: stmt.text(2),
+                                            primaryMuscle: stmt.text(3),
+                                            isCustom: stmt.int(4) != 0,
+                                            usageCount: Int(stmt.int(5))))
+            }
+            return rows
         }
-        return rows
     }
 
     /// Rename the display name only — `id` and `slug` are unchanged, so every
@@ -133,17 +135,19 @@ extension WorkoutStore {
     func resolveExercise(_ rawName: String) throws -> Int64? {
         let name = Self.normalizeName(rawName)
         guard !name.isEmpty else { throw ParseError.emptyExerciseName }
-        if let id = try exerciseID(canonicalNameMatching: name) { return id }
-        if let id = try exerciseID(aliasMatching: name) { return id }
-        // Layer 1.5: punctuation/plural-insensitive join. The seed can't list
-        // every spacing/plural variant ("chin ups" alongside "chin up"/"chinup"),
-        // and a missing one used to spawn a duplicate custom on save. This folds
-        // them onto the existing canonical without inventing a fuzzy match: whole
-        // strings must agree once non-alphanumerics and a trailing plural are
-        // stripped, so distinct lifts never collapse. Abbreviations still fall
-        // through to the fuzzy/semantic *proposals* (the confirm card's "Did you
-        // mean…"), which the user confirms.
-        return try exerciseID(looseMatching: name)
+        return try db.readTransaction {
+            if let id = try exerciseID(canonicalNameMatching: name) { return id }
+            if let id = try exerciseID(aliasMatching: name) { return id }
+            // Layer 1.5: punctuation/plural-insensitive join. The seed can't list
+            // every spacing/plural variant ("chin ups" alongside "chin up"/"chinup"),
+            // and a missing one used to spawn a duplicate custom on save. This folds
+            // them onto the existing canonical without inventing a fuzzy match: whole
+            // strings must agree once non-alphanumerics and a trailing plural are
+            // stripped, so distinct lifts never collapse. Abbreviations still fall
+            // through to the fuzzy/semantic *proposals* (the confirm card's "Did you
+            // mean…"), which the user confirms.
+            return try exerciseID(looseMatching: name)
+        }
     }
 
     /// A spacing/punctuation/plural-insensitive key for exercise joining:
@@ -185,19 +189,22 @@ extension WorkoutStore {
     func suggestExercisesFuzzy(for raw: String, limit: Int = 3) throws -> [ExerciseSuggestion] {
         let query = Self.normalizeName(raw)
         guard !query.isEmpty else { return [] }
-        let aliasMap = try aliasesByExercise()
-        let stmt = try db.prepare("SELECT id, canonical_name, family_key FROM exercises;")
-        defer { stmt.finalize() }
-        var hits: [ExerciseSuggestion] = []
-        while try stmt.step() {
-            let id = stmt.int(0)
-            let name = stmt.text(1) ?? ""
-            let candidates = [name] + (aliasMap[id] ?? [])
-            let best = candidates.map { FuzzyMatch.similarity(query, $0) }.max() ?? 0
-            if best >= Self.fuzzySuggestionThreshold {
-                hits.append(ExerciseSuggestion(exerciseID: id, canonicalName: name,
-                                               familyKey: stmt.text(2), score: best, via: .fuzzy))
+        let hits: [ExerciseSuggestion] = try db.readTransaction {
+            let aliasMap = try aliasesByExercise()
+            let stmt = try db.prepare("SELECT id, canonical_name, family_key FROM exercises;")
+            defer { stmt.finalize() }
+            var found: [ExerciseSuggestion] = []
+            while try stmt.step() {
+                let id = stmt.int(0)
+                let name = stmt.text(1) ?? ""
+                let candidates = [name] + (aliasMap[id] ?? [])
+                let best = candidates.map { FuzzyMatch.similarity(query, $0) }.max() ?? 0
+                if best >= Self.fuzzySuggestionThreshold {
+                    found.append(ExerciseSuggestion(exerciseID: id, canonicalName: name,
+                                                    familyKey: stmt.text(2), score: best, via: .fuzzy))
+                }
             }
+            return found
         }
         let queryLength = query.count
         return Array(hits.sorted {
@@ -222,13 +229,15 @@ extension WorkoutStore {
     /// writes and carries no `NaturalLanguage` symbol, so the gated matcher stays
     /// isolated. Ordered by id for a stable cache.
     func exerciseCanonicals() throws -> [(id: Int64, name: String, familyKey: String?)] {
-        let stmt = try db.prepare("SELECT id, canonical_name, family_key FROM exercises ORDER BY id;")
-        defer { stmt.finalize() }
-        var rows: [(id: Int64, name: String, familyKey: String?)] = []
-        while try stmt.step() {
-            rows.append((id: stmt.int(0), name: stmt.text(1) ?? "", familyKey: stmt.text(2)))
+        try db.readTransaction {
+            let stmt = try db.prepare("SELECT id, canonical_name, family_key FROM exercises ORDER BY id;")
+            defer { stmt.finalize() }
+            var rows: [(id: Int64, name: String, familyKey: String?)] = []
+            while try stmt.step() {
+                rows.append((id: stmt.int(0), name: stmt.text(1) ?? "", familyKey: stmt.text(2)))
+            }
+            return rows
         }
-        return rows
     }
 
     /// Resolve, creating a new muscle-less, user-correctable exercise when the
@@ -293,49 +302,55 @@ extension WorkoutStore {
     /// touching the write path. Exercises with no sets still appear (LEFT JOIN);
     /// validated against the v1 schema in sqlite3.
     func exerciseNames(limit: Int = 200) throws -> [String] {
-        let stmt = try db.prepare("""
-            SELECT e.canonical_name, COUNT(s.id) AS uses
-            FROM exercises e
-            LEFT JOIN sets s ON s.exercise_id = e.id
-            GROUP BY e.id
-            ORDER BY uses DESC, e.canonical_name ASC
-            LIMIT ?;
-        """)
-        defer { stmt.finalize() }
-        stmt.bind(int: Int64(limit), at: 1)
-        var names: [String] = []
-        while try stmt.step() {
-            if let name = stmt.text(0) { names.append(name) }
+        try db.readTransaction {
+            let stmt = try db.prepare("""
+                SELECT e.canonical_name, COUNT(s.id) AS uses
+                FROM exercises e
+                LEFT JOIN sets s ON s.exercise_id = e.id
+                GROUP BY e.id
+                ORDER BY uses DESC, e.canonical_name ASC
+                LIMIT ?;
+            """)
+            defer { stmt.finalize() }
+            stmt.bind(int: Int64(limit), at: 1)
+            var names: [String] = []
+            while try stmt.step() {
+                if let name = stmt.text(0) { names.append(name) }
+            }
+            return names
         }
-        return names
     }
 
     func exercise(id: Int64) throws -> Exercise? {
-        let stmt = try db.prepare("""
-            SELECT slug, canonical_name, family_key, primary_muscle, secondary_muscles
-            FROM exercises WHERE id = ?;
-        """)
-        defer { stmt.finalize() }
-        stmt.bind(int: id, at: 1)
-        guard try stmt.step() else { return nil }
-        return Exercise(id: id,
-                        slug: stmt.text(0) ?? "",
-                        canonicalName: stmt.text(1) ?? "",
-                        familyKey: stmt.text(2),
-                        primaryMuscle: stmt.text(3),
-                        secondaryMuscles: Self.decodeStringArray(stmt.text(4)))
+        try db.readTransaction {
+            let stmt = try db.prepare("""
+                SELECT slug, canonical_name, family_key, primary_muscle, secondary_muscles
+                FROM exercises WHERE id = ?;
+            """)
+            defer { stmt.finalize() }
+            stmt.bind(int: id, at: 1)
+            guard try stmt.step() else { return nil }
+            return Exercise(id: id,
+                            slug: stmt.text(0) ?? "",
+                            canonicalName: stmt.text(1) ?? "",
+                            familyKey: stmt.text(2),
+                            primaryMuscle: stmt.text(3),
+                            secondaryMuscles: Self.decodeStringArray(stmt.text(4)))
+        }
     }
 
     /// Owned aliases bucketed by exercise, for fuzzy suggestions and export —
     /// one query, sorted for a stable round-trip.
     func aliasesByExercise() throws -> [Int64: [String]] {
-        let stmt = try db.prepare("SELECT exercise_id, alias FROM exercise_aliases ORDER BY exercise_id, alias;")
-        defer { stmt.finalize() }
-        var map: [Int64: [String]] = [:]
-        while try stmt.step() {
-            map[stmt.int(0), default: []].append(stmt.text(1) ?? "")
+        try db.readTransaction {
+            let stmt = try db.prepare("SELECT exercise_id, alias FROM exercise_aliases ORDER BY exercise_id, alias;")
+            defer { stmt.finalize() }
+            var map: [Int64: [String]] = [:]
+            while try stmt.step() {
+                map[stmt.int(0), default: []].append(stmt.text(1) ?? "")
+            }
+            return map
         }
-        return map
     }
 
     // MARK: - Row-level writes (store-internal; the import path also inserts registry rows)

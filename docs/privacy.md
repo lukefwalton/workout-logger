@@ -1,6 +1,6 @@
 # Private Workout Logger — Privacy Policy
 
-_Last updated: 2026-06-21_
+_Last updated: 2026-07-12_
 
 Private Workout Logger is built privacy-first. The short version: **your data
 stays on your device.** There is no account, no server, and no tracking.
@@ -49,6 +49,18 @@ no photo-library permission; using the camera instead asks for camera
 permission in context. Recognized text goes through the same
 confirm-before-save flow as typed input. No image or recognized text is
 transmitted anywhere.
+
+## On-device text parsing (no cloud AI)
+
+Turning what you type (or scan) into structured sets is done by deterministic
+code on your device. On devices where Apple Intelligence is available and
+enabled, the app may additionally use **Apple's on-device Foundation Models**
+to help read free-form prose entries. That processing runs entirely on your
+iPhone using Apple's built-in system model: no text is sent to us, to Apple's
+servers by the app, or to any third party. The model only *proposes* a parse —
+nothing is saved until you confirm it. If Apple Intelligence is unavailable or
+disabled, the app simply uses its deterministic parser; there is no cloud
+fallback.
 
 ## Sharing is always your choice
 
