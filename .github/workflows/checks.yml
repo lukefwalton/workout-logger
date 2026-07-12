@@ -2,7 +2,7 @@ name: Checks
 
 # Config guardrails that don't need Xcode. Validates that the App Group
 # identifier in project.yml matches the constant in
-# Shared/SharedDatabase.swift (so the app and the Home Screen widget can never
+# WorkoutChatLog/Shared/SharedDatabase.swift (so the app and the Home Screen widget can never
 # drift onto two different on-device databases), and that the store's
 # write-path boundary holds now that WorkoutStore spans multiple files (its
 # raw connection and registry writers are internal, so the compiler no longer

@@ -10,21 +10,28 @@ extension WorkoutStore {
     func dataExport(includeNotes: Bool = true, exportedAt: Date = Date()) throws -> WorkoutDataExport {
         // One read transaction around all four table reads, so a save landing
         // mid-export can't produce a file whose sets disagree with its sessions.
-        try db.readTransaction {
-            let rows = try exportRows(includeNotes: includeNotes)
-            var sessions = try exportSessions(includeNotes: includeNotes)
-            for index in sessions.indices {
-                sessions[index].sets = rows.filter { $0.sessionID == sessions[index].id }.map(\.set)
-            }
-
-            return WorkoutDataExport(schemaVersion: 3,   // 3: adds cardio_entries (2: sessions carry ended_at / feel / is_deload)
-                                     exportedAt: Self.iso(exportedAt),
-                                     app: "WorkoutChatLog",
-                                     analyticsPolicy: ExportedAnalyticsPolicy(.default),
-                                     exercises: try exportExercises(),
-                                     sessions: sessions,
-                                     cardio: try exportCardio(includeNotes: includeNotes))
+        // Only the reads hold the connection; the rows→sessions stitching is
+        // pure CPU work and runs after the snapshot closes (the
+        // `HistoryModel.load` pattern), so a large export can't block writes
+        // for the in-memory assembly.
+        let (rows, sessionRows, exercises, cardio) = try db.readTransaction {
+            (try exportRows(includeNotes: includeNotes),
+             try exportSessions(includeNotes: includeNotes),
+             try exportExercises(),
+             try exportCardio(includeNotes: includeNotes))
         }
+        var sessions = sessionRows
+        for index in sessions.indices {
+            sessions[index].sets = rows.filter { $0.sessionID == sessions[index].id }.map(\.set)
+        }
+
+        return WorkoutDataExport(schemaVersion: 3,   // 3: adds cardio_entries (2: sessions carry ended_at / feel / is_deload)
+                                 exportedAt: Self.iso(exportedAt),
+                                 app: "WorkoutChatLog",
+                                 analyticsPolicy: ExportedAnalyticsPolicy(.default),
+                                 exercises: exercises,
+                                 sessions: sessions,
+                                 cardio: cardio)
     }
 
     func writeDataExport(includeNotes: Bool = true) throws -> URL {
