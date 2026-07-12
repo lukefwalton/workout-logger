@@ -123,8 +123,10 @@ self_test() {
     "WorkoutChatLog/Features/Bad.swift" 'let db = try SQLiteDB(path: p)'
   expect 1 "SQLiteDB construction in the widget target is caught" \
     "WorkoutWidget/Bad.swift" 'let db = try SQLiteDB(path: p)'
-  expect 0 "Shared may construct its read-only SQLiteDB" \
-    "WorkoutChatLog/Shared/Reader.swift" 'let db = try SQLiteDB(path: url.path)'
+  # Uses the repo's real allowlisted path, so if the Shared module ever moves,
+  # this fixture is the drift alarm — not a green run over the wrong tree.
+  expect 0 "Shared may construct its read-only SQLiteDB (real path)" \
+    "WorkoutChatLog/Shared/SharedDatabase.swift" 'let db = try SQLiteDB(path: url.path)'
   echo "✅ Guard self-test passed (8 fixtures)"
 }
 

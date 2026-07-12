@@ -99,6 +99,18 @@ final class SQLiteDB: @unchecked Sendable {
     func transaction<T>(_ body: () throws -> T) throws -> T {
         connectionLock.lock()
         defer { connectionLock.unlock() }
+        // Catch misuse with a precise diagnostic before the generic BEGIN
+        // failure: we hold the recursive lock, so an already-open transaction
+        // here can only be our own thread's — either a write attempted inside
+        // `readTransaction`/`WorkoutStore.snapshot` (reads-only by contract),
+        // or a nested `transaction` (they don't nest; the import path inserts
+        // raw rows for exactly this reason — learnings/027).
+        guard sqlite3_get_autocommit(handle) != 0 else {
+            throw DBError.exec("""
+                write transaction opened inside an open transaction — writes are \
+                not allowed inside readTransaction/snapshot, and transactions do not nest
+                """)
+        }
         try execute("BEGIN IMMEDIATE;")
         do {
             let result = try body()

@@ -62,7 +62,9 @@ final class WorkoutStore: @unchecked Sendable {
     /// committing mid-snapshot can't make two reads disagree (e.g. History's
     /// session rows vs. its cardio list). Nests harmlessly around the store's
     /// individually-wrapped reads. Read-only by contract — writes belong in
-    /// the domain APIs, which own their own transactions.
+    /// the domain APIs, which own their own transactions; a write attempted
+    /// inside a snapshot fails loudly with `SQLiteDB`'s writes-inside-read
+    /// diagnostic and rolls the snapshot back (pinned in `SQLiteDBTests`).
     func snapshot<T>(_ body: () throws -> T) throws -> T {
         try db.readTransaction(body)
     }

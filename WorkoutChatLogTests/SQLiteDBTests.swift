@@ -218,6 +218,27 @@ final class SQLiteDBTests: XCTestCase {
         XCTAssertEqual(try count("exercises"), 1)
     }
 
+    /// The reads-only contract of `readTransaction` (and therefore of
+    /// `WorkoutStore.snapshot`, which wraps it): opening a write transaction
+    /// inside one is a caller bug and must fail with the store-specific
+    /// diagnostic — not SQLite's generic nested-transaction error — and must
+    /// leave the connection clean for the next write.
+    func testWriteTransactionInsideReadTransactionThrowsClearDiagnostic() throws {
+        XCTAssertThrowsError(try db.readTransaction {
+            try db.transaction {
+                try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('bad', 'Bad', 't');")
+            }
+        }) { error in
+            XCTAssertTrue("\(error)".contains("not allowed inside readTransaction/snapshot"),
+                          "expected the writes-inside-read diagnostic, got: \(error)")
+        }
+        // The failed snapshot rolled back; the connection is immediately writable.
+        try db.transaction {
+            try db.execute("INSERT INTO exercises (slug, canonical_name, created_at) VALUES ('good', 'Good', 't');")
+        }
+        XCTAssertEqual(try count("exercises"), 1)
+    }
+
     /// The connection lock's core guarantee: a transaction body is atomic
     /// against concurrent readers on the SAME connection, not just each C call
     /// (which is all FULLMUTEX gives). Writers insert exercises two-at-a-time
